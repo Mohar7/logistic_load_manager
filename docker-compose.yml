@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: logistics-api
+    networks:
+      - app-network
+    restart: always
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=5115
+      - DB_NAME=logistics
+      - DEBUG=True
+    volumes:
+      - ./app:/app/app
+      - ./alembic:/app/alembic
+    command: >
+      bash -c "
+      while ! nc -z db 5432; do sleep 0.5; done &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      "
+
+  db:
+    image: postgres:latest
+    networks:
+      - app-network
+    container_name: logistics-db
+    restart: always
+    ports:
+      - "5115:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=5115
+      - POSTGRES_DB=logistics
+    volumes:
+      - logistics-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  init-db:
+    build: .
+    container_name: logistics-init-db
+    networks:
+      - app-network
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=5115
+      - DB_NAME=logistics
+    command: >
+      bash -c "
+      alembic upgrade head &&
+      python -c 'from app.db.init_db import init_db; from app.db.database import SessionLocal; init_db(SessionLocal())'
+      "
+    volumes:
+      - ./app:/app/app
+      - ./alembic:/app/alembic
+
+volumes:
+  logistics-db-data:
+
+networks:
+  app-network:
+    driver: bridge
