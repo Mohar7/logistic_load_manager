@@ -23,10 +23,10 @@ class LoadRepository:
         Create a new load record in the database.
 
         Args:
-                load_data (Dict[str, Any]): Load data from parsed trip
+                        load_data (Dict[str, Any]): Load data from parsed trip
 
         Returns:
-                Load: Created load instance
+                        Load: Created load instance
         """
         try:
             # Check if facilities exist, create if not
@@ -88,11 +88,11 @@ class LoadRepository:
         Create a leg for a load.
 
         Args:
-                load_id (int): ID of the parent load
-                leg_data (Dict[str, Any]): Leg data from parsing
+                        load_id (int): ID of the parent load
+                        leg_data (Dict[str, Any]): Leg data from parsing
 
         Returns:
-                Leg: Created leg instance
+                        Leg: Created leg instance
         """
         try:
             db_leg = Leg(
@@ -127,10 +127,10 @@ class LoadRepository:
         Get a load by its ID.
 
         Args:
-                load_id (int): Load ID to find
+                        load_id (int): Load ID to find
 
         Returns:
-                Optional[Load]: Load if found, None otherwise
+                        Optional[Load]: Load if found, None otherwise
         """
         return self.db.query(Load).filter(Load.id == load_id).first()
 
@@ -139,23 +139,26 @@ class LoadRepository:
         Get a load by its trip ID.
 
         Args:
-                trip_id (str): Trip ID to find
+                        trip_id (str): Trip ID to find
 
         Returns:
-                Optional[Load]: Load if found, None otherwise
+                        Optional[Load]: Load if found, None otherwise
         """
         return self.db.query(Load).filter(Load.trip_id == trip_id).first()
+
+    def get_loads_by_dispatcher_id(self, dispatcher_id):
+        return self.db.query(Load).filter(Load.dispatcher_id == dispatcher_id).all()
 
     def get_loads(self, skip: int = 0, limit: int = 100) -> List[Load]:
         """
         Get a list of loads with pagination.
 
         Args:
-                skip (int): Number of records to skip
-                limit (int): Maximum number of records to return
+                        skip (int): Number of records to skip
+                        limit (int): Maximum number of records to return
 
         Returns:
-                List[Load]: List of loads
+                        List[Load]: List of loads
         """
         return self.db.query(Load).offset(skip).limit(limit).all()
 
@@ -164,10 +167,10 @@ class LoadRepository:
         Get all legs for a specific load.
 
         Args:
-                load_id (int): Load ID to get legs for
+                        load_id (int): Load ID to get legs for
 
         Returns:
-                List[Leg]: List of legs
+                        List[Leg]: List of legs
         """
         return self.db.query(Leg).filter(Leg.load_id == load_id).all()
 
@@ -176,11 +179,11 @@ class LoadRepository:
         Get a facility by ID or create it if it doesn't exist.
 
         Args:
-                facility_id (str): Facility ID
-                location (str): Facility location
+                        facility_id (str): Facility ID
+                        location (str): Facility location
 
         Returns:
-                Facility: Found or created facility
+                        Facility: Found or created facility
         """
         # Try to find by name first
         facility = self.db.query(Facility).filter(Facility.name == facility_id).first()
@@ -213,7 +216,7 @@ class LoadRepository:
         Get or create a default company for testing purposes.
 
         Returns:
-                Company: Default company instance
+                        Company: Default company instance
         """
         company = self.db.query(Company).first()
         if not company:

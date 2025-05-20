@@ -210,7 +210,7 @@ async def get_loads(skip: int = 0, limit: int = 100, db: Session = Depends(get_d
     return response
 
 
-@router.get("/update_dispatcher_for_load")
+@router.get("/set_dispatcher/{load_id}/{dispatcher_id}")
 async def update_dispatcher_for_load(
     load_id: int, dispatcher_id: int, db: Session = Depends(get_db)
 ):
