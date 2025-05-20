@@ -40,6 +40,13 @@ class DispatcherRepository:
             self.db.query(Dispatchers).filter(Dispatchers.id == dispatcher_id).first()
         )
 
+    def get_dispatcher_by_telegram_id(self, telegram_id: int) -> Optional[Dispatchers]:
+        return (
+            self.db.query(Dispatchers)
+            .filter(Dispatchers.telegram_id == telegram_id)
+            .first()
+        )
+
     def get_dispatchers(self, skip: int = 0, limit: int = 100) -> List[Dispatchers]:
         return self.db.query(Dispatchers).offset(skip).limit(limit).all()
 
@@ -50,9 +57,13 @@ class DispatcherRepository:
         telegram_id: Optional[int] = None,
     ) -> Optional[Dispatchers]:
         try:
-            self.db.query(Dispatchers).filter(Dispatchers.id == dispatcher_id).update(
-                {Dispatchers.name: name, Dispatchers.telegram_id: telegram_id}
+            dispatcher = (
+                self.db.query(Dispatchers)
+                .filter(Dispatchers.id == dispatcher_id)
+                .update({Dispatchers.name: name, Dispatchers.telegram_id: telegram_id})
             )
+            self.db.commit()
+            return dispatcher
 
         except SQLAlchemyError as e:
             self.db.rollback()
