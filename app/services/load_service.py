@@ -5,7 +5,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from app.core.parser.parsing_service import ParsingService
 from app.db.repositories.load_repository import LoadRepository
-from app.db.models import Load, Leg
 import logging
 
 logger = logging.getLogger(__name__)
