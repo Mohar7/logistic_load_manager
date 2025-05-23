@@ -95,11 +95,20 @@ class LoadRepository:
                         Leg: Created leg instance
         """
         try:
+            pickup_facility = self._get_or_create_facility(
+                leg_data["pick_up_facility_id"], leg_data["pick_up_address"]
+            )
+
+            dropoff_facility = self._get_or_create_facility(
+                leg_data["drop_off_facility_id"], leg_data["drop_off_address"]
+            )
             db_leg = Leg(
                 leg_id=leg_data["leg_id"],
                 load_id=load_id,
-                pickup_facility_id=leg_data["pick_up_facility_id"],
-                dropoff_facility_id=leg_data["drop_off_facility_id"],
+	            pickup_facility_id=pickup_facility.id,
+	            dropoff_facility_id=dropoff_facility.id,
+                pickup_facility_name=pickup_facility.name,
+                dropoff_facility_name=dropoff_facility.name,
                 pickup_address=leg_data["pick_up_address"],
                 dropoff_address=leg_data["drop_off_address"],
                 pickup_time=leg_data["pick_up_time"],

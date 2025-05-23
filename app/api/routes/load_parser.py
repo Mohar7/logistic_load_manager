@@ -37,8 +37,8 @@ async def parse_load(
 
 @router.post("/create", response_model=LoadResponse)
 async def create_load(
-    dispatcher_id=Annotated[int, Query(default=None)],
-    text: str = Annotated[str, Body(..., media_type="text/plain")],
+    dispatcher_id: Annotated[int|None, Query()] = None,
+    text: Annotated[str, Body(media_type="text/plain")] = None,
     db: Session = Depends(get_db),
 ):
     load_service = LoadService(db)
