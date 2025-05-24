@@ -36,25 +36,32 @@ class DispatcherService:
         """
         try:
             # Check for existing dispatcher
-            existing = self.dispatcher_repo.get_dispatcher_by_telegram_id(dispatcher_data.telegram_id)
+            existing = self.dispatcher_repo.get_dispatcher_by_telegram_id(
+                dispatcher_data.telegram_id
+            )
             if existing:
-                raise ValueError(f"Dispatcher with telegram_id {dispatcher_data.telegram_id} already exists.")
+                raise ValueError(
+                    f"Dispatcher with telegram_id {dispatcher_data.telegram_id} already exists."
+                )
 
             # Save to DB
             self.dispatcher_repo.add_dispatcher_to_db(
-                name=dispatcher_data.name,
-                telegram_id=dispatcher_data.telegram_id
+                name=dispatcher_data.name, telegram_id=dispatcher_data.telegram_id
             )
 
             # Fetch created dispatcher
-            created_dispatcher = self.dispatcher_repo.get_dispatcher_by_telegram_id(dispatcher_data.telegram_id)
+            created_dispatcher = self.dispatcher_repo.get_dispatcher_by_telegram_id(
+                dispatcher_data.telegram_id
+            )
             logger.info(f"Dispatcher '{dispatcher_data.name}' added successfully.")
             return DispatcherResponse.model_validate(created_dispatcher)
 
         except IntegrityError as e:
             self.db.rollback()
             logger.error(f"Integrity error in add_dispatcher: {str(e)}")
-            raise ValueError(f"Dispatcher with telegram_id {dispatcher_data.telegram_id} already exists.") from e
+            raise ValueError(
+                f"Dispatcher with telegram_id {dispatcher_data.telegram_id} already exists."
+            ) from e
         except Exception as e:
             logger.error(f"Unexpected error in add_dispatcher: {str(e)}")
             raise
@@ -72,7 +79,9 @@ class DispatcherService:
         dispatcher = self.dispatcher_repo.get_dispatcher_by_id(dispatcher_id)
         return DispatcherResponse.model_validate(dispatcher) if dispatcher else None
 
-    def get_dispatcher_by_telegram_id(self, telegram_id: int) -> Optional[DispatcherResponse]:
+    def get_dispatcher_by_telegram_id(
+        self, telegram_id: int
+    ) -> Optional[DispatcherResponse]:
         """
         Retrieve a dispatcher by Telegram ID.
 
@@ -85,7 +94,9 @@ class DispatcherService:
         dispatcher = self.dispatcher_repo.get_dispatcher_by_telegram_id(telegram_id)
         return DispatcherResponse.model_validate(dispatcher) if dispatcher else None
 
-    def get_dispatchers(self, skip: int = 0, limit: int = 100) -> List[DispatcherResponse]:
+    def get_dispatchers(
+        self, skip: int = 0, limit: int = 100
+    ) -> List[DispatcherResponse]:
         """
         Get a list of dispatchers.
 
@@ -121,9 +132,7 @@ class DispatcherService:
         """
         try:
             updated_dispatcher = self.dispatcher_repo.update_dispatcher(
-                dispatcher_id=dispatcher_id,
-                name=name,
-                telegram_id=telegram_id
+                dispatcher_id=dispatcher_id, name=name, telegram_id=telegram_id
             )
             if not updated_dispatcher:
                 logger.warning(f"Dispatcher with ID {dispatcher_id} not found.")

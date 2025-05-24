@@ -114,9 +114,9 @@ logistics-system/
 
    # Database settings
    DB_HOST=localhost
-   DB_PORT=5443
+   DB_PORT=5432
    DB_USER=postgres
-   DB_PASSWORD=postgres
+   DB_PASSWORD=5115
    DB_NAME=logistics
 
    # Telegram settings

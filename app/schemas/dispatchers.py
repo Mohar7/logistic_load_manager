@@ -20,7 +20,6 @@ class Dispatcher(DispatcherBase):
 
 
 class DispatcherResponse(BaseModel):
-
     id: int
     name: str
     telegram_id: int

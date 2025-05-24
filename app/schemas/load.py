@@ -25,6 +25,21 @@ class LegCreate(LegBase):
     pass
 
 
+class LegUpdate(BaseModel):
+    leg_id: Optional[str] = None
+    pick_up_facility_id: Optional[str] = None
+    drop_off_facility_id: Optional[str] = None
+    pick_up_address: Optional[str] = None
+    drop_off_address: Optional[str] = None
+    pick_up_time: Optional[datetime] = None
+    drop_off_time: Optional[datetime] = None
+    pick_up_time_str: Optional[str] = None
+    drop_off_time_str: Optional[str] = None
+    fuel_sur_charge: Optional[condecimal(max_digits=12, decimal_places=2)] = None
+    distance: Optional[float] = None
+    assigned_driver: Optional[str] = None
+
+
 class LegInDB(LegBase):
     id: int
     load_id: int
@@ -55,6 +70,24 @@ class TripCreate(TripBase):
     pass
 
 
+class TripUpdate(BaseModel):
+    trip_id: Optional[str] = None
+    pick_up_facility_id: Optional[str] = None
+    drop_off_facility_id: Optional[str] = None
+    pick_up_address: Optional[str] = None
+    drop_off_address: Optional[str] = None
+    pick_up_time: Optional[datetime] = None
+    drop_off_time: Optional[datetime] = None
+    pick_up_time_str: Optional[str] = None
+    drop_off_time_str: Optional[str] = None
+    rate: Optional[condecimal(max_digits=12, decimal_places=2)] = None
+    rate_per_mile: Optional[condecimal(max_digits=12, decimal_places=2)] = None
+    distance: Optional[float] = None
+    assigned_driver: Optional[str] = None
+    is_team_load: Optional[bool] = None
+    dispatcher_id: Optional[int] = None
+
+
 class TripInDB(TripBase):
     id: int
 
@@ -76,6 +109,29 @@ class LoadRequest(BaseModel):
     """
 
     text: str = Body(..., description="Load text to parse", media_type="text/plain")
+
+
+class LoadUpdateRequest(BaseModel):
+    """
+    Request model for updating a load.
+    """
+
+    trip_id: Optional[str] = None
+    pickup_facility_id: Optional[int] = None
+    dropoff_facility_id: Optional[int] = None
+    pickup_address: Optional[str] = None
+    dropoff_address: Optional[str] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    rate: Optional[condecimal(max_digits=12, decimal_places=2)] = None
+    rate_per_mile: Optional[condecimal(max_digits=12, decimal_places=2)] = None
+    distance: Optional[float] = None
+    assigned_driver: Optional[str] = None
+    is_team_load: Optional[bool] = None
+    dispatcher_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True
 
 
 class ParsedLoadResponse(BaseModel):

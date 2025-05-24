@@ -1,4 +1,4 @@
-# app/db/repositories/load_repository.py - updated
+# app/db/repositories/load_repository.py - updated with update/delete methods
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List, Optional, Dict, Any
@@ -23,10 +23,10 @@ class LoadRepository:
         Create a new load record in the database.
 
         Args:
-                        load_data (Dict[str, Any]): Load data from parsed trip
+            load_data (Dict[str, Any]): Load data from parsed trip
 
         Returns:
-                        Load: Created load instance
+            Load: Created load instance
         """
         try:
             # Check if facilities exist, create if not
@@ -83,16 +83,110 @@ class LoadRepository:
             logger.error(f"Error creating load: {str(e)}")
             raise
 
+    def update_load(self, load_id: int, update_data: Dict[str, Any]) -> Optional[Load]:
+        """
+        Update an existing load.
+
+        Args:
+            load_id (int): ID of the load to update
+            update_data (Dict[str, Any]): Data to update
+
+        Returns:
+            Optional[Load]: Updated load instance or None if not found
+        """
+        try:
+            # Get the existing load
+            db_load = self.db.query(Load).filter(Load.id == load_id).first()
+            if not db_load:
+                return None
+
+            # Handle facility updates if addresses are provided
+            if "pick_up_facility_id" in update_data or "pick_up_address" in update_data:
+                pickup_facility = self._get_or_create_facility(
+                    update_data.get(
+                        "pick_up_facility_id", db_load.pickup_facility_name
+                    ),
+                    update_data.get("pick_up_address", db_load.pickup_address),
+                )
+                update_data["pickup_facility_id"] = pickup_facility.id
+
+            if (
+                "drop_off_facility_id" in update_data
+                or "drop_off_address" in update_data
+            ):
+                dropoff_facility = self._get_or_create_facility(
+                    update_data.get(
+                        "drop_off_facility_id", db_load.dropoff_facility_name
+                    ),
+                    update_data.get("drop_off_address", db_load.dropoff_address),
+                )
+                update_data["dropoff_facility_id"] = dropoff_facility.id
+
+            # Handle driver updates
+            if "assigned_driver" in update_data:
+                driver_id = None
+                if update_data["assigned_driver"]:
+                    driver = (
+                        self.db.query(Driver)
+                        .filter(Driver.name == update_data["assigned_driver"])
+                        .first()
+                    )
+                    if driver:
+                        driver_id = driver.id
+                update_data["driver_id"] = driver_id
+
+            # Update the load with provided data
+            for key, value in update_data.items():
+                if hasattr(db_load, key):
+                    setattr(db_load, key, value)
+
+            self.db.commit()
+            self.db.refresh(db_load)
+
+            return db_load
+
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            logger.error(f"Error updating load {load_id}: {str(e)}")
+            raise
+
+    def delete_load(self, load_id: int) -> bool:
+        """
+        Delete a load by its ID.
+
+        Args:
+            load_id (int): ID of the load to delete
+
+        Returns:
+            bool: True if deleted successfully, False if not found
+        """
+        try:
+            # Get the load
+            db_load = self.db.query(Load).filter(Load.id == load_id).first()
+            if not db_load:
+                return False
+
+            # Delete the load (legs should be deleted by CASCADE if configured)
+            self.db.delete(db_load)
+            self.db.commit()
+
+            return True
+
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            logger.error(f"Error deleting load {load_id}: {str(e)}")
+            raise
+
     def create_leg(self, load_id: int, leg_data: Dict[str, Any]) -> Leg:
         """
         Create a leg for a load.
 
         Args:
-                        load_id (int): ID of the parent load
-                        leg_data (Dict[str, Any]): Leg data from parsing
+            load_id (int): ID of the parent load
+            leg_data (Dict[str, Any]): Leg data from parsing
 
         Returns:
-                        Leg: Created leg instance
+            Leg: Created leg instance
         """
         try:
             pickup_facility = self._get_or_create_facility(
@@ -102,11 +196,12 @@ class LoadRepository:
             dropoff_facility = self._get_or_create_facility(
                 leg_data["drop_off_facility_id"], leg_data["drop_off_address"]
             )
+
             db_leg = Leg(
                 leg_id=leg_data["leg_id"],
                 load_id=load_id,
-	            pickup_facility_id=pickup_facility.id,
-	            dropoff_facility_id=dropoff_facility.id,
+                pickup_facility_id=pickup_facility.id,
+                dropoff_facility_id=dropoff_facility.id,
                 pickup_facility_name=pickup_facility.name,
                 dropoff_facility_name=dropoff_facility.name,
                 pickup_address=leg_data["pick_up_address"],
@@ -131,15 +226,116 @@ class LoadRepository:
             logger.error(f"Error creating leg: {str(e)}")
             raise
 
+    def update_leg(self, leg_id: int, update_data: Dict[str, Any]) -> Optional[Leg]:
+        """
+        Update an existing leg.
+
+        Args:
+            leg_id (int): ID of the leg to update
+            update_data (Dict[str, Any]): Data to update
+
+        Returns:
+            Optional[Leg]: Updated leg instance or None if not found
+        """
+        try:
+            # Get the existing leg
+            db_leg = self.db.query(Leg).filter(Leg.id == leg_id).first()
+            if not db_leg:
+                return None
+
+            # Handle facility updates if addresses are provided
+            if "pick_up_facility_id" in update_data or "pick_up_address" in update_data:
+                pickup_facility = self._get_or_create_facility(
+                    update_data.get("pick_up_facility_id", db_leg.pickup_facility_name),
+                    update_data.get("pick_up_address", db_leg.pickup_address),
+                )
+                update_data["pickup_facility_id"] = pickup_facility.id
+                update_data["pickup_facility_name"] = pickup_facility.name
+
+            if (
+                "drop_off_facility_id" in update_data
+                or "drop_off_address" in update_data
+            ):
+                dropoff_facility = self._get_or_create_facility(
+                    update_data.get(
+                        "drop_off_facility_id", db_leg.dropoff_facility_name
+                    ),
+                    update_data.get("drop_off_address", db_leg.dropoff_address),
+                )
+                update_data["dropoff_facility_id"] = dropoff_facility.id
+                update_data["dropoff_facility_name"] = dropoff_facility.name
+
+            # Update the leg with provided data
+            for key, value in update_data.items():
+                if hasattr(db_leg, key):
+                    setattr(db_leg, key, value)
+
+            self.db.commit()
+            self.db.refresh(db_leg)
+
+            return db_leg
+
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            logger.error(f"Error updating leg {leg_id}: {str(e)}")
+            raise
+
+    def delete_legs_for_load(self, load_id: int) -> int:
+        """
+        Delete all legs for a specific load.
+
+        Args:
+            load_id (int): Load ID to delete legs for
+
+        Returns:
+            int: Number of legs deleted
+        """
+        try:
+            deleted_count = self.db.query(Leg).filter(Leg.load_id == load_id).delete()
+            self.db.commit()
+            return deleted_count
+
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            logger.error(f"Error deleting legs for load {load_id}: {str(e)}")
+            raise
+
+    def delete_leg(self, leg_id: int) -> bool:
+        """
+        Delete a specific leg.
+
+        Args:
+            leg_id (int): ID of the leg to delete
+
+        Returns:
+            bool: True if deleted successfully, False if not found
+        """
+        try:
+            # Get the leg
+            db_leg = self.db.query(Leg).filter(Leg.id == leg_id).first()
+            if not db_leg:
+                return False
+
+            # Delete the leg
+            self.db.delete(db_leg)
+            self.db.commit()
+
+            return True
+
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            logger.error(f"Error deleting leg {leg_id}: {str(e)}")
+            raise
+
     def get_load_by_id(self, load_id: int) -> Optional[Load]:
         """
         Get a load by its ID.
 
         Args:
-                        load_id (int): Load ID to find
+            load_id (int): Load ID to find
 
         Returns:
-                        Optional[Load]: Load if found, None otherwise
+            Optional[Load]: Load if found, None otherwise
         """
         return self.db.query(Load).filter(Load.id == load_id).first()
 
@@ -148,10 +344,10 @@ class LoadRepository:
         Get a load by its trip ID.
 
         Args:
-                        trip_id (str): Trip ID to find
+            trip_id (str): Trip ID to find
 
         Returns:
-                        Optional[Load]: Load if found, None otherwise
+            Optional[Load]: Load if found, None otherwise
         """
         return self.db.query(Load).filter(Load.trip_id == trip_id).first()
 
@@ -163,11 +359,11 @@ class LoadRepository:
         Get a list of loads with pagination.
 
         Args:
-                        skip (int): Number of records to skip
-                        limit (int): Maximum number of records to return
+            skip (int): Number of records to skip
+            limit (int): Maximum number of records to return
 
         Returns:
-                        List[Load]: List of loads
+            List[Load]: List of loads
         """
         return self.db.query(Load).offset(skip).limit(limit).all()
 
@@ -176,23 +372,35 @@ class LoadRepository:
         Get all legs for a specific load.
 
         Args:
-                        load_id (int): Load ID to get legs for
+            load_id (int): Load ID to get legs for
 
         Returns:
-                        List[Leg]: List of legs
+            List[Leg]: List of legs
         """
         return self.db.query(Leg).filter(Leg.load_id == load_id).all()
+
+    def get_leg_by_id(self, leg_id: int) -> Optional[Leg]:
+        """
+        Get a leg by its ID.
+
+        Args:
+            leg_id (int): Leg ID to find
+
+        Returns:
+            Optional[Leg]: Leg if found, None otherwise
+        """
+        return self.db.query(Leg).filter(Leg.id == leg_id).first()
 
     def _get_or_create_facility(self, facility_id: str, location: str) -> Facility:
         """
         Get a facility by ID or create it if it doesn't exist.
 
         Args:
-                        facility_id (str): Facility ID
-                        location (str): Facility location
+            facility_id (str): Facility ID
+            location (str): Facility location
 
         Returns:
-                        Facility: Found or created facility
+            Facility: Found or created facility
         """
         # Try to find by name first
         facility = self.db.query(Facility).filter(Facility.name == facility_id).first()
@@ -225,7 +433,7 @@ class LoadRepository:
         Get or create a default company for testing purposes.
 
         Returns:
-                        Company: Default company instance
+            Company: Default company instance
         """
         company = self.db.query(Company).first()
         if not company:

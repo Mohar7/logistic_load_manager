@@ -1,7 +1,7 @@
 # app/api/routes/dispatcher_management.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List , Optional
+from typing import List, Optional
 
 from app.db.database import get_db
 from app.services.dispatcher_service import DispatcherService
@@ -17,7 +17,10 @@ router = APIRouter(
 # Create a new dispatcher
 # -------------------------------
 
-@router.post("/", response_model=DispatcherResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/", response_model=DispatcherResponse, status_code=status.HTTP_201_CREATED
+)
 def create_dispatcher(
     dispatcher_data: AddDispatcher,
     db: Session = Depends(get_db),
@@ -28,11 +31,16 @@ def create_dispatcher(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal Server Error",
+        )
+
 
 # -------------------------------
 # Get dispatcher by ID
 # -------------------------------
+
 
 @router.get("/{dispatcher_id}", response_model=DispatcherResponse)
 def read_dispatcher(dispatcher_id: int, db: Session = Depends(get_db)):
@@ -42,9 +50,11 @@ def read_dispatcher(dispatcher_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Dispatcher not found")
     return dispatcher
 
+
 # -------------------------------
 # Get dispatcher by Telegram ID
 # -------------------------------
+
 
 @router.get("/telegram/{telegram_id}", response_model=DispatcherResponse)
 def get_dispatcher_by_telegram(telegram_id: int, db: Session = Depends(get_db)):
@@ -54,18 +64,22 @@ def get_dispatcher_by_telegram(telegram_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Dispatcher not found")
     return dispatcher
 
+
 # -------------------------------
 # Get list of dispatchers
 # -------------------------------
+
 
 @router.get("/", response_model=List[DispatcherResponse])
 def read_dispatchers(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     service = DispatcherService(db)
     return service.get_dispatchers(skip=skip, limit=limit)
 
+
 # -------------------------------
 # Update a dispatcher
 # -------------------------------
+
 
 @router.put("/{dispatcher_id}", response_model=DispatcherResponse)
 def update_dispatcher(
@@ -76,18 +90,25 @@ def update_dispatcher(
 ):
     service = DispatcherService(db)
     try:
-        updated = service.update_dispatcher(dispatcher_id=dispatcher_id, name=name, telegram_id=telegram_id)
+        updated = service.update_dispatcher(
+            dispatcher_id=dispatcher_id, name=name, telegram_id=telegram_id
+        )
         if not updated:
             raise HTTPException(status_code=404, detail="Dispatcher not found")
         return updated
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal Server Error",
+        )
+
 
 # -------------------------------
 # Delete a dispatcher
 # -------------------------------
+
 
 @router.delete("/{dispatcher_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_dispatcher(dispatcher_id: int, db: Session = Depends(get_db)):
@@ -100,4 +121,7 @@ def delete_dispatcher(dispatcher_id: int, db: Session = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal Server Error",
+        )
