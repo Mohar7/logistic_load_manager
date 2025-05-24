@@ -6,7 +6,7 @@ from app.api.routes import (
     load_management,
     driver_management,
     company_management,
-	dispatcher_management
+    dispatcher_management,
 )
 from app.config import get_settings
 import logging
@@ -46,6 +46,7 @@ app.include_router(load_management.router)
 app.include_router(driver_management.router)  # Add driver management router
 app.include_router(company_management.router)  # Add company management router
 app.include_router(dispatcher_management.router)
+
 
 @app.on_event("startup")
 async def startup_event():
