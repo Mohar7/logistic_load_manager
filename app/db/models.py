@@ -62,7 +62,7 @@ class TelegramChat(Base):
 class Driver(Base):
     __tablename__ = "drivers"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255))
     company_id = Column(Integer, ForeignKey("companies.id"))
     chat_id = Column(Integer, ForeignKey("telegram_chats.id"))
@@ -86,40 +86,40 @@ class Load(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     trip_id = Column(String(255), unique=True)
-    
+
     # Facility IDs (nullable for when facilities don't exist yet)
     pickup_facility_id = Column(Integer, ForeignKey("facilities.id"), nullable=True)
     dropoff_facility_id = Column(Integer, ForeignKey("facilities.id"), nullable=True)
-    
+
     # Facility names/codes (for when we have codes like PSP1, TUS5)
     pickup_facility_name = Column(String(255), nullable=True)
     dropoff_facility_name = Column(String(255), nullable=True)
-    
+
     # Address information
     pickup_address = Column(String(255))
     dropoff_address = Column(String(255))
     pickup_full_address = Column(Text, nullable=True)
     dropoff_full_address = Column(Text, nullable=True)
-    
+
     # Time information
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
     start_time_str = Column(String(50))
     end_time_str = Column(String(50))
-    
+
     # Financial information
     rate = Column(Numeric(12, 2), nullable=False)
     rate_per_mile = Column(Numeric(12, 2), nullable=False)
     distance = Column(Numeric(10, 2))
-    
+
     # Driver assignment
     driver_id = Column(Integer, ForeignKey("drivers.id"), nullable=True)
     assigned_driver = Column(String(255), nullable=True)
-    
+
     # Company and dispatcher
     company_id = Column(Integer, ForeignKey("companies.id"))
     dispatcher_id = Column(Integer, ForeignKey("dispatchers.id"), nullable=True)
-    
+
     # Load properties
     is_team_load = Column(Boolean, default=False)
 
@@ -142,25 +142,25 @@ class Leg(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     leg_id = Column(String(255), unique=True)
     load_id = Column(Integer, ForeignKey("loads.id"))
-    
+
     # Facility information (both IDs and names/codes)
     pickup_facility_id = Column(Integer, ForeignKey("facilities.id"), nullable=True)
     dropoff_facility_id = Column(Integer, ForeignKey("facilities.id"), nullable=True)
     pickup_facility_name = Column(String(255), nullable=True)
     dropoff_facility_name = Column(String(255), nullable=True)
-    
+
     # Address information
     pickup_address = Column(String(255))
     dropoff_address = Column(String(255))
     pickup_full_address = Column(Text, nullable=True)
     dropoff_full_address = Column(Text, nullable=True)
-    
+
     # Time information
     pickup_time = Column(DateTime, nullable=False)
     dropoff_time = Column(DateTime, nullable=False)
     pickup_time_str = Column(String(50))
     dropoff_time_str = Column(String(50))
-    
+
     # Financial and distance information
     fuel_sur_charge = Column(Numeric(12, 2))
     distance = Column(Numeric(10, 2))
