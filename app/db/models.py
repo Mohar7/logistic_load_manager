@@ -8,6 +8,7 @@ from sqlalchemy import (
     Numeric,
     Boolean,
     Text,
+    BIGINT,
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -52,7 +53,7 @@ class TelegramChat(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     group_name = Column(String(255))
-    chat_token = Column(Integer)
+    chat_token = Column(BIGINT)
     company_id = Column(Integer, ForeignKey("companies.id"))
 
     company = relationship("Company", back_populates="telegram_chats")
@@ -76,6 +77,7 @@ class Dispatchers(Base):
     __tablename__ = "dispatchers"
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255))
+    role = Column(String(255))
     telegram_id = Column(Integer)
 
     loads = relationship("Load", back_populates="dispatcher")
