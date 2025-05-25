@@ -9,3 +9,5 @@ alembic
 aiohttp
 python-dateutil
 pydantic-settings
+aiogram==3.4.1
+aiohttp==3.9.1

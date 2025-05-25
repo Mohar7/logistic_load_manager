@@ -7,6 +7,8 @@ from app.api.routes import (
     driver_management,
     company_management,
     dispatcher_management,
+    bot_management,
+    telegram_integration,
 )
 from app.config import get_settings
 import logging
@@ -43,9 +45,11 @@ app.add_middleware(
 # Include routers
 app.include_router(load_parser.router)
 app.include_router(load_management.router)
-app.include_router(driver_management.router)  # Add driver management router
-app.include_router(company_management.router)  # Add company management router
+app.include_router(driver_management.router)
+app.include_router(company_management.router)
 app.include_router(dispatcher_management.router)
+app.include_router(bot_management.router)
+app.include_router(telegram_integration.router)
 
 
 @app.on_event("startup")

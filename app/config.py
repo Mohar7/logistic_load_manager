@@ -1,4 +1,4 @@
-# app/config.py
+# app/config.py - Updated to handle Telegram bot token from environment
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 import os
@@ -22,7 +22,9 @@ class Settings(BaseSettings):
     db_user: str = os.getenv("DB_USER", "postgres")
     db_password: str = os.getenv("DB_PASSWORD", "5115")
     db_name: str = os.getenv("DB_NAME", "logistics")
-    telegram_bot_token: str = "5807602528:AAGQ4_-KPOwszRrfzhylb0bc7LTTZVGF9Cw"
+
+    # Telegram Bot Configuration
+    telegram_bot_token: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
     class Config:
         env_file = "../.env"
