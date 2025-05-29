@@ -1,4 +1,25 @@
 services:
+  # Frontend service (new)
+  frontend:
+    build:
+      context: ./frontend  # assuming your frontend code is in ./frontend directory
+      dockerfile: Dockerfile
+    container_name: logistics-frontend
+    networks:
+      - app-network
+    restart: always
+    ports:
+      - "5173:5173"  # Vite dev server port
+      - "4173:4173"  # Vite preview port
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules  # prevent node_modules from being overwritten
+    # Choose one of these commands:
+    command: ["sh", "-c", "pnpm vite build && pnpm preview --host 0.0.0.0"]
+    environment:
+      - NODE_ENV=production
+      - VITE_API_URL=http://0.0.0.0:8000  # Point to your backend API
+
   app:
     build: .
     container_name: logistics-api
