@@ -1,9 +1,8 @@
 # app/bot/handlers/auth.py
-from aiogram import types
-from aiogram.filters import Command
-from aiogram.fsm.context import FSMContext
-from sqlalchemy.orm import Session
 import logging
+
+from aiogram import types
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +12,7 @@ class AuthHandler:
 
     @staticmethod
     async def handle_registration_status(
-        message: types.Message, db: Session, user_data: dict
+        message: types.Message, db: AsyncSession, user_data: dict
     ):
         """Check registration status"""
         if user_data:

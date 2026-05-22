@@ -12,10 +12,14 @@ dependencies = [
     "fastapi>=0.115,<0.116",
     "uvicorn[standard]>=0.32,<0.33",
 
-    # DB (note: psycopg2 is sync — Week 2 migrates to asyncpg + async SQLAlchemy)
-    "sqlalchemy>=2.0,<2.1",
+    # DB — async-first stack: asyncpg driver + SQLAlchemy AsyncSession.
+    # psycopg2-binary is kept ONLY because some tools (older Alembic versions,
+    # local psql scripts) still expect a sync URL. Runtime uses asyncpg.
+    "sqlalchemy[asyncio]>=2.0,<2.1",
+    "asyncpg>=0.30,<0.31",  # 0.30+ ships cp314 wheels
     "psycopg2-binary>=2.9.9,<3.0",
     "alembic>=1.13,<2.0",
+    "greenlet>=3.0,<4.0",  # required by sqlalchemy's asyncio bridge
 
     # Validation / settings
     "pydantic>=2.7,<3.0",

@@ -1,8 +1,9 @@
 # app/config.py - Updated to handle Telegram bot token from environment
-from pydantic_settings import BaseSettings
-from functools import lru_cache
 import os
+from functools import lru_cache
+
 from dotenv import load_dotenv
+from pydantic_settings import BaseSettings
 
 # Load environment variables from .env file
 load_dotenv()
@@ -30,7 +31,7 @@ class Settings(BaseSettings):
         env_file = "../.env"
 
 
-@lru_cache()
+@lru_cache
 def get_settings():
     """
     Returns cached settings instance for better performance.

@@ -1,18 +1,18 @@
 # alembic/env.py
-from logging.config import fileConfig
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-from alembic import context
 import os
 import sys
-from dotenv import load_dotenv
+from logging.config import fileConfig
 
-from app.config import get_settings
+from alembic import context
+from dotenv import load_dotenv
+from sqlalchemy import engine_from_config, pool
 
 # Add the parent directory to the path so that we can import from app
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# Import the app's models
+from app.db.database import SYNC_DATABASE_URL
+
+# Import the app's models so that Base.metadata is populated for autogenerate.
 from app.db.models import Base
 
 # Load environment variables directly
@@ -22,12 +22,9 @@ load_dotenv()
 # access to the values within the .ini file in use.
 config = context.config
 
-# Get database URL directly from environment variables
-# Get database URL from app settings
-settings = get_settings()
-db_url = f"postgresql://{settings.db_user}:{settings.db_password}@{settings.db_host}:{settings.db_port}/{settings.db_name}"
-
-config.set_main_option("sqlalchemy.url", db_url)
+# Alembic uses psycopg2, never asyncpg. SYNC_DATABASE_URL already encodes
+# postgresql+psycopg2://… from app/db/database.py.
+config.set_main_option("sqlalchemy.url", SYNC_DATABASE_URL)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

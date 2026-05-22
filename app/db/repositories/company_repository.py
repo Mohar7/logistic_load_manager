@@ -1,9 +1,11 @@
 # app/db/repositories/company_repository.py
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
-from typing import List, Optional
-from app.db.models import Company
 import logging
+
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.models import Company
 
 logger = logging.getLogger(__name__)
 
@@ -14,10 +16,10 @@ class CompanyRepository:
     Handles database operations for companies.
     """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
-    def create_company(
+    async def create_company(
         self, name: str, usdot: int, carrier_identifier: str, mc: int
     ) -> Company:
         """
@@ -38,17 +40,17 @@ class CompanyRepository:
             )
 
             self.db.add(company)
-            self.db.commit()
-            self.db.refresh(company)
+            await self.db.commit()
+            await self.db.refresh(company)
 
             return company
 
         except SQLAlchemyError as e:
-            self.db.rollback()
-            logger.error(f"Error creating company: {str(e)}")
+            await self.db.rollback()
+            logger.error(f"Error creating company: {e!s}")
             raise
 
-    def get_company_by_id(self, company_id: int) -> Optional[Company]:
+    async def get_company_by_id(self, company_id: int) -> Company | None:
         """
         Get a company by ID.
 
@@ -58,9 +60,10 @@ class CompanyRepository:
         Returns:
             Optional[Company]: Company if found, None otherwise
         """
-        return self.db.query(Company).filter(Company.id == company_id).first()
+        result = await self.db.execute(select(Company).where(Company.id == company_id))
+        return result.scalar_one_or_none()
 
-    def get_company_by_name(self, name: str) -> Optional[Company]:
+    async def get_company_by_name(self, name: str) -> Company | None:
         """
         Get a company by name.
 
@@ -70,9 +73,10 @@ class CompanyRepository:
         Returns:
             Optional[Company]: Company if found, None otherwise
         """
-        return self.db.query(Company).filter(Company.name == name).first()
+        result = await self.db.execute(select(Company).where(Company.name == name))
+        return result.scalar_one_or_none()
 
-    def get_company_by_usdot(self, usdot: int) -> Optional[Company]:
+    async def get_company_by_usdot(self, usdot: int) -> Company | None:
         """
         Get a company by USDOT number.
 
@@ -82,9 +86,10 @@ class CompanyRepository:
         Returns:
             Optional[Company]: Company if found, None otherwise
         """
-        return self.db.query(Company).filter(Company.usdot == usdot).first()
+        result = await self.db.execute(select(Company).where(Company.usdot == usdot))
+        return result.scalar_one_or_none()
 
-    def get_companies(self, skip: int = 0, limit: int = 100) -> List[Company]:
+    async def get_companies(self, skip: int = 0, limit: int = 100) -> list[Company]:
         """
         Get a list of companies with pagination.
 
@@ -95,16 +100,17 @@ class CompanyRepository:
         Returns:
             List[Company]: List of companies
         """
-        return self.db.query(Company).offset(skip).limit(limit).all()
+        result = await self.db.execute(select(Company).offset(skip).limit(limit))
+        return list(result.scalars().all())
 
-    def update_company(
+    async def update_company(
         self,
         company_id: int,
-        name: Optional[str] = None,
-        usdot: Optional[int] = None,
-        carrier_identifier: Optional[str] = None,
-        mc: Optional[int] = None,
-    ) -> Optional[Company]:
+        name: str | None = None,
+        usdot: int | None = None,
+        carrier_identifier: str | None = None,
+        mc: int | None = None,
+    ) -> Company | None:
         """
         Update a company's information.
 
@@ -119,7 +125,10 @@ class CompanyRepository:
             Optional[Company]: Updated company if found, None otherwise
         """
         try:
-            company = self.db.query(Company).filter(Company.id == company_id).first()
+            result = await self.db.execute(
+                select(Company).where(Company.id == company_id)
+            )
+            company = result.scalar_one_or_none()
             if not company:
                 return None
 
@@ -135,17 +144,17 @@ class CompanyRepository:
             if mc is not None:
                 company.mc = mc
 
-            self.db.commit()
-            self.db.refresh(company)
+            await self.db.commit()
+            await self.db.refresh(company)
 
             return company
 
         except SQLAlchemyError as e:
-            self.db.rollback()
-            logger.error(f"Error updating company: {str(e)}")
+            await self.db.rollback()
+            logger.error(f"Error updating company: {e!s}")
             raise
 
-    def delete_company(self, company_id: int) -> bool:
+    async def delete_company(self, company_id: int) -> bool:
         """
         Delete a company.
 
@@ -156,16 +165,19 @@ class CompanyRepository:
             bool: True if the company was deleted, False otherwise
         """
         try:
-            company = self.db.query(Company).filter(Company.id == company_id).first()
+            result = await self.db.execute(
+                select(Company).where(Company.id == company_id)
+            )
+            company = result.scalar_one_or_none()
             if not company:
                 return False
 
-            self.db.delete(company)
-            self.db.commit()
+            await self.db.delete(company)
+            await self.db.commit()
 
             return True
 
         except SQLAlchemyError as e:
-            self.db.rollback()
-            logger.error(f"Error deleting company: {str(e)}")
+            await self.db.rollback()
+            logger.error(f"Error deleting company: {e!s}")
             raise

@@ -1,10 +1,13 @@
 # app/db/repositories/load_repository.py - updated with update/delete methods
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
-from typing import List, Optional, Dict, Any
-from app.db.models import Load, Leg, Facility, Driver, Company
-from app.schemas.load import TripCreate, LegCreate, Trip, Leg as LegSchema
 import logging
+from typing import Any
+
+from sqlalchemy import delete, select, update
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.db.models import Company, Driver, Facility, Leg, Load
 
 logger = logging.getLogger(__name__)
 
@@ -15,10 +18,10 @@ class LoadRepository:
     Handles database operations for loads and legs.
     """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
-    def create_load(self, load_data: Dict[str, Any]) -> Load:
+    async def create_load(self, load_data: dict[str, Any]) -> Load:
         """
         Create a new load record in the database.
 
@@ -30,27 +33,26 @@ class LoadRepository:
         """
         try:
             # Check if facilities exist, create if not
-            pickup_facility = self._get_or_create_facility(
+            pickup_facility = await self._get_or_create_facility(
                 load_data["pick_up_facility_id"], load_data["pick_up_address"]
             )
 
-            dropoff_facility = self._get_or_create_facility(
+            dropoff_facility = await self._get_or_create_facility(
                 load_data["drop_off_facility_id"], load_data["drop_off_address"]
             )
 
             # Check if driver exists
             driver_id = None
             if load_data.get("assigned_driver"):
-                driver = (
-                    self.db.query(Driver)
-                    .filter(Driver.name == load_data["assigned_driver"])
-                    .first()
+                result = await self.db.execute(
+                    select(Driver).where(Driver.name == load_data["assigned_driver"])
                 )
+                driver = result.scalar_one_or_none()
                 if driver:
                     driver_id = driver.id
 
             # Get default company (for demo purposes)
-            company = self._get_default_company()
+            company = await self._get_default_company()
 
             # Create the load
             db_load = Load(
@@ -73,17 +75,19 @@ class LoadRepository:
             )
 
             self.db.add(db_load)
-            self.db.commit()
-            self.db.refresh(db_load)
+            await self.db.commit()
+            await self.db.refresh(db_load)
 
             return db_load
 
         except SQLAlchemyError as e:
-            self.db.rollback()
-            logger.error(f"Error creating load: {str(e)}")
+            await self.db.rollback()
+            logger.error(f"Error creating load: {e!s}")
             raise
 
-    def update_load(self, load_id: int, update_data: Dict[str, Any]) -> Optional[Load]:
+    async def update_load(
+        self, load_id: int, update_data: dict[str, Any]
+    ) -> Load | None:
         """
         Update an existing load.
 
@@ -96,13 +100,14 @@ class LoadRepository:
         """
         try:
             # Get the existing load
-            db_load = self.db.query(Load).filter(Load.id == load_id).first()
+            result = await self.db.execute(select(Load).where(Load.id == load_id))
+            db_load = result.scalar_one_or_none()
             if not db_load:
                 return None
 
             # Handle facility updates if addresses are provided
             if "pick_up_facility_id" in update_data or "pick_up_address" in update_data:
-                pickup_facility = self._get_or_create_facility(
+                pickup_facility = await self._get_or_create_facility(
                     update_data.get(
                         "pick_up_facility_id", db_load.pickup_facility_name
                     ),
@@ -114,7 +119,7 @@ class LoadRepository:
                 "drop_off_facility_id" in update_data
                 or "drop_off_address" in update_data
             ):
-                dropoff_facility = self._get_or_create_facility(
+                dropoff_facility = await self._get_or_create_facility(
                     update_data.get(
                         "drop_off_facility_id", db_load.dropoff_facility_name
                     ),
@@ -126,11 +131,12 @@ class LoadRepository:
             if "assigned_driver" in update_data:
                 driver_id = None
                 if update_data["assigned_driver"]:
-                    driver = (
-                        self.db.query(Driver)
-                        .filter(Driver.name == update_data["assigned_driver"])
-                        .first()
+                    result = await self.db.execute(
+                        select(Driver).where(
+                            Driver.name == update_data["assigned_driver"]
+                        )
                     )
+                    driver = result.scalar_one_or_none()
                     if driver:
                         driver_id = driver.id
                 update_data["driver_id"] = driver_id
@@ -140,17 +146,17 @@ class LoadRepository:
                 if hasattr(db_load, key):
                     setattr(db_load, key, value)
 
-            self.db.commit()
-            self.db.refresh(db_load)
+            await self.db.commit()
+            await self.db.refresh(db_load)
 
             return db_load
 
         except SQLAlchemyError as e:
-            self.db.rollback()
-            logger.error(f"Error updating load {load_id}: {str(e)}")
+            await self.db.rollback()
+            logger.error(f"Error updating load {load_id}: {e!s}")
             raise
 
-    def delete_load(self, load_id: int) -> bool:
+    async def delete_load(self, load_id: int) -> bool:
         """
         Delete a load by its ID.
 
@@ -162,22 +168,23 @@ class LoadRepository:
         """
         try:
             # Get the load
-            db_load = self.db.query(Load).filter(Load.id == load_id).first()
+            result = await self.db.execute(select(Load).where(Load.id == load_id))
+            db_load = result.scalar_one_or_none()
             if not db_load:
                 return False
 
             # Delete the load (legs should be deleted by CASCADE if configured)
-            self.db.delete(db_load)
-            self.db.commit()
+            await self.db.delete(db_load)
+            await self.db.commit()
 
             return True
 
         except SQLAlchemyError as e:
-            self.db.rollback()
-            logger.error(f"Error deleting load {load_id}: {str(e)}")
+            await self.db.rollback()
+            logger.error(f"Error deleting load {load_id}: {e!s}")
             raise
 
-    def create_leg(self, load_id: int, leg_data: Dict[str, Any]) -> Leg:
+    async def create_leg(self, load_id: int, leg_data: dict[str, Any]) -> Leg:
         """
         Create a leg for a load.
 
@@ -189,11 +196,11 @@ class LoadRepository:
             Leg: Created leg instance
         """
         try:
-            pickup_facility = self._get_or_create_facility(
+            pickup_facility = await self._get_or_create_facility(
                 leg_data["pick_up_facility_id"], leg_data["pick_up_address"]
             )
 
-            dropoff_facility = self._get_or_create_facility(
+            dropoff_facility = await self._get_or_create_facility(
                 leg_data["drop_off_facility_id"], leg_data["drop_off_address"]
             )
 
@@ -216,17 +223,19 @@ class LoadRepository:
             )
 
             self.db.add(db_leg)
-            self.db.commit()
-            self.db.refresh(db_leg)
+            await self.db.commit()
+            await self.db.refresh(db_leg)
 
             return db_leg
 
         except SQLAlchemyError as e:
-            self.db.rollback()
-            logger.error(f"Error creating leg: {str(e)}")
+            await self.db.rollback()
+            logger.error(f"Error creating leg: {e!s}")
             raise
 
-    def update_leg(self, leg_id: int, update_data: Dict[str, Any]) -> Optional[Leg]:
+    async def update_leg(
+        self, leg_id: int, update_data: dict[str, Any]
+    ) -> Leg | None:
         """
         Update an existing leg.
 
@@ -239,13 +248,14 @@ class LoadRepository:
         """
         try:
             # Get the existing leg
-            db_leg = self.db.query(Leg).filter(Leg.id == leg_id).first()
+            result = await self.db.execute(select(Leg).where(Leg.id == leg_id))
+            db_leg = result.scalar_one_or_none()
             if not db_leg:
                 return None
 
             # Handle facility updates if addresses are provided
             if "pick_up_facility_id" in update_data or "pick_up_address" in update_data:
-                pickup_facility = self._get_or_create_facility(
+                pickup_facility = await self._get_or_create_facility(
                     update_data.get("pick_up_facility_id", db_leg.pickup_facility_name),
                     update_data.get("pick_up_address", db_leg.pickup_address),
                 )
@@ -256,7 +266,7 @@ class LoadRepository:
                 "drop_off_facility_id" in update_data
                 or "drop_off_address" in update_data
             ):
-                dropoff_facility = self._get_or_create_facility(
+                dropoff_facility = await self._get_or_create_facility(
                     update_data.get(
                         "drop_off_facility_id", db_leg.dropoff_facility_name
                     ),
@@ -270,17 +280,17 @@ class LoadRepository:
                 if hasattr(db_leg, key):
                     setattr(db_leg, key, value)
 
-            self.db.commit()
-            self.db.refresh(db_leg)
+            await self.db.commit()
+            await self.db.refresh(db_leg)
 
             return db_leg
 
         except SQLAlchemyError as e:
-            self.db.rollback()
-            logger.error(f"Error updating leg {leg_id}: {str(e)}")
+            await self.db.rollback()
+            logger.error(f"Error updating leg {leg_id}: {e!s}")
             raise
 
-    def delete_legs_for_load(self, load_id: int) -> int:
+    async def delete_legs_for_load(self, load_id: int) -> int:
         """
         Delete all legs for a specific load.
 
@@ -291,16 +301,18 @@ class LoadRepository:
             int: Number of legs deleted
         """
         try:
-            deleted_count = self.db.query(Leg).filter(Leg.load_id == load_id).delete()
-            self.db.commit()
-            return deleted_count
+            result = await self.db.execute(
+                delete(Leg).where(Leg.load_id == load_id)
+            )
+            await self.db.commit()
+            return result.rowcount or 0
 
         except SQLAlchemyError as e:
-            self.db.rollback()
-            logger.error(f"Error deleting legs for load {load_id}: {str(e)}")
+            await self.db.rollback()
+            logger.error(f"Error deleting legs for load {load_id}: {e!s}")
             raise
 
-    def delete_leg(self, leg_id: int) -> bool:
+    async def delete_leg(self, leg_id: int) -> bool:
         """
         Delete a specific leg.
 
@@ -312,22 +324,23 @@ class LoadRepository:
         """
         try:
             # Get the leg
-            db_leg = self.db.query(Leg).filter(Leg.id == leg_id).first()
+            result = await self.db.execute(select(Leg).where(Leg.id == leg_id))
+            db_leg = result.scalar_one_or_none()
             if not db_leg:
                 return False
 
             # Delete the leg
-            self.db.delete(db_leg)
-            self.db.commit()
+            await self.db.delete(db_leg)
+            await self.db.commit()
 
             return True
 
         except SQLAlchemyError as e:
-            self.db.rollback()
-            logger.error(f"Error deleting leg {leg_id}: {str(e)}")
+            await self.db.rollback()
+            logger.error(f"Error deleting leg {leg_id}: {e!s}")
             raise
 
-    def get_load_by_id(self, load_id: int) -> Optional[Load]:
+    async def get_load_by_id(self, load_id: int) -> Load | None:
         """
         Get a load by its ID.
 
@@ -337,9 +350,17 @@ class LoadRepository:
         Returns:
             Optional[Load]: Load if found, None otherwise
         """
-        return self.db.query(Load).filter(Load.id == load_id).first()
+        result = await self.db.execute(
+            select(Load)
+            .options(
+                selectinload(Load.pickup_facility),
+                selectinload(Load.dropoff_facility),
+            )
+            .where(Load.id == load_id)
+        )
+        return result.scalar_one_or_none()
 
-    def get_load_by_trip_id(self, trip_id: str) -> Optional[Load]:
+    async def get_load_by_trip_id(self, trip_id: str) -> Load | None:
         """
         Get a load by its trip ID.
 
@@ -349,12 +370,23 @@ class LoadRepository:
         Returns:
             Optional[Load]: Load if found, None otherwise
         """
-        return self.db.query(Load).filter(Load.trip_id == trip_id).first()
+        result = await self.db.execute(
+            select(Load)
+            .options(
+                selectinload(Load.pickup_facility),
+                selectinload(Load.dropoff_facility),
+            )
+            .where(Load.trip_id == trip_id)
+        )
+        return result.scalar_one_or_none()
 
-    def get_loads_by_dispatcher_id(self, dispatcher_id):
-        return self.db.query(Load).filter(Load.dispatcher_id == dispatcher_id).all()
+    async def get_loads_by_dispatcher_id(self, dispatcher_id: int) -> list[Load]:
+        result = await self.db.execute(
+            select(Load).where(Load.dispatcher_id == dispatcher_id)
+        )
+        return list(result.scalars().all())
 
-    def get_loads(self, skip: int = 0, limit: int = 100) -> List[Load]:
+    async def get_loads(self, skip: int = 0, limit: int = 100) -> list[Load]:
         """
         Get a list of loads with pagination.
 
@@ -365,9 +397,18 @@ class LoadRepository:
         Returns:
             List[Load]: List of loads
         """
-        return self.db.query(Load).offset(skip).limit(limit).all()
+        result = await self.db.execute(
+            select(Load)
+            .options(
+                selectinload(Load.pickup_facility),
+                selectinload(Load.dropoff_facility),
+            )
+            .offset(skip)
+            .limit(limit)
+        )
+        return list(result.scalars().all())
 
-    def get_legs_for_load(self, load_id: int) -> List[Leg]:
+    async def get_legs_for_load(self, load_id: int) -> list[Leg]:
         """
         Get all legs for a specific load.
 
@@ -377,9 +418,10 @@ class LoadRepository:
         Returns:
             List[Leg]: List of legs
         """
-        return self.db.query(Leg).filter(Leg.load_id == load_id).all()
+        result = await self.db.execute(select(Leg).where(Leg.load_id == load_id))
+        return list(result.scalars().all())
 
-    def get_leg_by_id(self, leg_id: int) -> Optional[Leg]:
+    async def get_leg_by_id(self, leg_id: int) -> Leg | None:
         """
         Get a leg by its ID.
 
@@ -389,9 +431,12 @@ class LoadRepository:
         Returns:
             Optional[Leg]: Leg if found, None otherwise
         """
-        return self.db.query(Leg).filter(Leg.id == leg_id).first()
+        result = await self.db.execute(select(Leg).where(Leg.id == leg_id))
+        return result.scalar_one_or_none()
 
-    def _get_or_create_facility(self, facility_id: str, location: str) -> Facility:
+    async def _get_or_create_facility(
+        self, facility_id: str, location: str
+    ) -> Facility:
         """
         Get a facility by ID or create it if it doesn't exist.
 
@@ -403,39 +448,44 @@ class LoadRepository:
             Facility: Found or created facility
         """
         # Try to find by name first
-        facility = self.db.query(Facility).filter(Facility.name == facility_id).first()
+        result = await self.db.execute(
+            select(Facility).where(Facility.name == facility_id)
+        )
+        facility = result.scalar_one_or_none()
 
         if not facility:
             logger.info(f"Creating new facility: {facility_id}")
             try:
                 facility = Facility(name=facility_id, location=location)
                 self.db.add(facility)
-                self.db.commit()
-                self.db.refresh(facility)
+                await self.db.commit()
+                await self.db.refresh(facility)
             except SQLAlchemyError as e:
-                self.db.rollback()
-                logger.error(f"Error creating facility: {str(e)}")
+                await self.db.rollback()
+                logger.error(f"Error creating facility: {e!s}")
                 # Try again in case another process created it concurrently
-                facility = (
-                    self.db.query(Facility).filter(Facility.name == facility_id).first()
+                result = await self.db.execute(
+                    select(Facility).where(Facility.name == facility_id)
                 )
+                facility = result.scalar_one_or_none()
                 if not facility:
                     # If still not found, create a default facility
                     facility = Facility(name=facility_id, location=location)
                     self.db.add(facility)
-                    self.db.commit()
-                    self.db.refresh(facility)
+                    await self.db.commit()
+                    await self.db.refresh(facility)
 
         return facility
 
-    def _get_default_company(self) -> Company:
+    async def _get_default_company(self) -> Company:
         """
         Get or create a default company for testing purposes.
 
         Returns:
             Company: Default company instance
         """
-        company = self.db.query(Company).first()
+        result = await self.db.execute(select(Company).limit(1))
+        company = result.scalar_one_or_none()
         if not company:
             company = Company(
                 name="Default Logistics Company",
@@ -444,17 +494,21 @@ class LoadRepository:
                 mc=67890,
             )
             self.db.add(company)
-            self.db.commit()
-            self.db.refresh(company)
+            await self.db.commit()
+            await self.db.refresh(company)
         return company
 
-    def update_dispatcher_for_the_load(self, load_id: int, dispatcher_id: int):
+    async def update_dispatcher_for_the_load(
+        self, load_id: int, dispatcher_id: int
+    ) -> None:
         try:
-            self.db.query(Load).filter(Load.id == load_id).update(
-                {Load.dispatcher_id: dispatcher_id}
+            await self.db.execute(
+                update(Load)
+                .where(Load.id == load_id)
+                .values(dispatcher_id=dispatcher_id)
             )
-            self.db.commit()
+            await self.db.commit()
         except SQLAlchemyError as e:
-            self.db.rollback()
-            logger.error(f"Error setting dispatcher for the load: {str(e)}")
+            await self.db.rollback()
+            logger.error(f"Error setting dispatcher for the load: {e!s}")
             raise

@@ -1,10 +1,9 @@
 # app/core/utils/text_utils.py
 import re
 from decimal import Decimal, InvalidOperation
-from typing import Optional, List
 
 
-def find_first(pattern: str, text: str, group: int = 0) -> Optional[str]:
+def find_first(pattern: str, text: str, group: int = 0) -> str | None:
     """
     Helper method to find the first match of a regex pattern.
 
@@ -25,7 +24,7 @@ def find_first(pattern: str, text: str, group: int = 0) -> Optional[str]:
     return None
 
 
-def find_all(pattern: str, text: str, group: int = 0) -> List[str]:
+def find_all(pattern: str, text: str, group: int = 0) -> list[str]:
     """
     Helper method to find all matches of a regex pattern.
 
@@ -40,7 +39,7 @@ def find_all(pattern: str, text: str, group: int = 0) -> List[str]:
     return re.findall(pattern, text)
 
 
-def parse_decimal(value: Optional[str], replacements: dict = None) -> Optional[Decimal]:
+def parse_decimal(value: str | None, replacements: dict = None) -> Decimal | None:
     """
     Helper method to parse Decimal values.
 

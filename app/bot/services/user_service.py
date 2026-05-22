@@ -1,9 +1,12 @@
 # app/bot/services/user_service.py - Updated for cross-company access
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
-from typing import List, Optional, Dict, Any
-from app.db.models import Dispatchers, Company, TelegramChat
 import logging
+from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.models import Company, Dispatchers
 
 logger = logging.getLogger(__name__)
 
@@ -11,8 +14,8 @@ logger = logging.getLogger(__name__)
 class UserService:
     """Service for managing bot users and registration - Updated"""
 
-    def __init__(self, db: Session):
-        self.db = db
+    def __init__(self, db: AsyncSession):
+        self.db: AsyncSession = db
 
     async def create_user_registration(
         self, telegram_id: int, username: str, name: str, role: str
@@ -21,10 +24,10 @@ class UserService:
         try:
             # Check if user already exists
             existing_user = (
-                self.db.query(Dispatchers)
-                .filter(Dispatchers.telegram_id == telegram_id)
-                .first()
-            )
+                await self.db.execute(
+                    select(Dispatchers).where(Dispatchers.telegram_id == telegram_id)
+                )
+            ).scalar_one_or_none()
 
             if existing_user:
                 return False
@@ -32,8 +35,8 @@ class UserService:
             # Create user with role - dispatchers no longer need company assignment
             user = Dispatchers(name=name, telegram_id=telegram_id, role=role)
             self.db.add(user)
-            self.db.commit()
-            self.db.refresh(user)
+            await self.db.commit()
+            await self.db.refresh(user)
 
             logger.info(
                 f"Created user registration: {name} ({role}) - Telegram ID: {telegram_id}"
@@ -42,7 +45,7 @@ class UserService:
 
         except SQLAlchemyError as e:
             logger.error(f"Error creating user registration: {e}")
-            self.db.rollback()
+            await self.db.rollback()
             return False
 
     async def complete_dispatcher_registration(
@@ -52,10 +55,10 @@ class UserService:
         try:
             # Check if dispatcher exists
             dispatcher = (
-                self.db.query(Dispatchers)
-                .filter(Dispatchers.telegram_id == telegram_id)
-                .first()
-            )
+                await self.db.execute(
+                    select(Dispatchers).where(Dispatchers.telegram_id == telegram_id)
+                )
+            ).scalar_one_or_none()
 
             if not dispatcher:
                 # Create new dispatcher - they can manage all companies
@@ -63,8 +66,8 @@ class UserService:
                     name=name, telegram_id=telegram_id, role="dispatcher"
                 )
                 self.db.add(dispatcher)
-                self.db.commit()
-                self.db.refresh(dispatcher)
+                await self.db.commit()
+                await self.db.refresh(dispatcher)
 
             logger.info(
                 f"Completed dispatcher registration: {name} - Can manage all companies"
@@ -73,20 +76,20 @@ class UserService:
 
         except SQLAlchemyError as e:
             logger.error(f"Error completing dispatcher registration: {e}")
-            self.db.rollback()
+            await self.db.rollback()
             return False
 
     async def approve_manager(self, telegram_id: int) -> bool:
         """Approve a manager registration"""
         try:
             user = (
-                self.db.query(Dispatchers)
-                .filter(
-                    Dispatchers.telegram_id == telegram_id,
-                    Dispatchers.role == "manager",
+                await self.db.execute(
+                    select(Dispatchers).where(
+                        Dispatchers.telegram_id == telegram_id,
+                        Dispatchers.role == "manager",
+                    )
                 )
-                .first()
-            )
+            ).scalar_one_or_none()
 
             if not user:
                 return False
@@ -98,28 +101,29 @@ class UserService:
 
         except SQLAlchemyError as e:
             logger.error(f"Error approving manager: {e}")
-            self.db.rollback()
+            await self.db.rollback()
             return False
 
-    async def get_companies(self) -> List[Company]:
+    async def get_companies(self) -> list[Company]:
         """Get all available companies"""
         try:
-            return self.db.query(Company).all()
+            result = await self.db.execute(select(Company))
+            return list(result.scalars().all())
         except SQLAlchemyError as e:
             logger.error(f"Error getting companies: {e}")
             return []
 
     async def get_user_by_telegram_id(
         self, telegram_id: int
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Get user information by Telegram ID"""
         try:
             # Check for user in Dispatchers table (now handles both dispatchers and managers)
             user = (
-                self.db.query(Dispatchers)
-                .filter(Dispatchers.telegram_id == telegram_id)
-                .first()
-            )
+                await self.db.execute(
+                    select(Dispatchers).where(Dispatchers.telegram_id == telegram_id)
+                )
+            ).scalar_one_or_none()
 
             if user:
                 return {
@@ -136,10 +140,11 @@ class UserService:
             logger.error(f"Error getting user: {e}")
             return None
 
-    async def get_all_users(self) -> List[Dict[str, Any]]:
+    async def get_all_users(self) -> list[dict[str, Any]]:
         """Get all registered users"""
         try:
-            users = self.db.query(Dispatchers).all()
+            result = await self.db.execute(select(Dispatchers))
+            users = list(result.scalars().all())
 
             return [
                 {
@@ -155,14 +160,15 @@ class UserService:
             logger.error(f"Error getting all users: {e}")
             return []
 
-    async def get_pending_managers(self) -> List[Dict[str, Any]]:
+    async def get_pending_managers(self) -> list[dict[str, Any]]:
         """Get managers pending approval"""
         try:
             # You could add a status column and filter by status='pending'
             # For now, we'll just return all managers
-            managers = (
-                self.db.query(Dispatchers).filter(Dispatchers.role == "manager").all()
+            result = await self.db.execute(
+                select(Dispatchers).where(Dispatchers.role == "manager")
             )
+            managers = list(result.scalars().all())
 
             return [
                 {
@@ -181,43 +187,47 @@ class UserService:
     async def delete_user(self, user_id: int) -> bool:
         """Delete a user"""
         try:
-            user = self.db.query(Dispatchers).filter(Dispatchers.id == user_id).first()
+            user = (
+                await self.db.execute(
+                    select(Dispatchers).where(Dispatchers.id == user_id)
+                )
+            ).scalar_one_or_none()
             if not user:
                 return False
 
-            self.db.delete(user)
-            self.db.commit()
+            await self.db.delete(user)
+            await self.db.commit()
 
             logger.info(f"Deleted user: {user.name} ({user.role})")
             return True
 
         except SQLAlchemyError as e:
             logger.error(f"Error deleting user: {e}")
-            self.db.rollback()
+            await self.db.rollback()
             return False
 
     async def update_user_role(self, telegram_id: int, new_role: str) -> bool:
         """Update a user's role"""
         try:
             user = (
-                self.db.query(Dispatchers)
-                .filter(Dispatchers.telegram_id == telegram_id)
-                .first()
-            )
+                await self.db.execute(
+                    select(Dispatchers).where(Dispatchers.telegram_id == telegram_id)
+                )
+            ).scalar_one_or_none()
 
             if not user:
                 return False
 
             old_role = user.role
             user.role = new_role
-            self.db.commit()
+            await self.db.commit()
 
             logger.info(f"Updated user role: {user.name} from {old_role} to {new_role}")
             return True
 
         except SQLAlchemyError as e:
             logger.error(f"Error updating user role: {e}")
-            self.db.rollback()
+            await self.db.rollback()
             return False
 
     async def notify_admins_new_registration(
@@ -226,12 +236,14 @@ class UserService:
         """Notify administrators about new registration"""
         try:
             # Get all existing managers to notify them
-            managers = (
-                self.db.query(Dispatchers).filter(Dispatchers.role == "manager").all()
+            result = await self.db.execute(
+                select(Dispatchers).where(Dispatchers.role == "manager")
             )
+            managers = list(result.scalars().all())
 
             if managers:
                 from aiogram import Bot
+
                 from app.config import get_settings
 
                 settings = get_settings()
@@ -265,23 +277,24 @@ class UserService:
 
 
 # Migration script to update existing records (run this once)
-async def migrate_existing_users(db: Session):
+async def migrate_existing_users(db: AsyncSession):
     """Migrate existing users to have proper roles"""
     try:
         # Update users without roles to be dispatchers
-        users_without_roles = (
-            db.query(Dispatchers).filter(Dispatchers.role.is_(None)).all()
+        result = await db.execute(
+            select(Dispatchers).where(Dispatchers.role.is_(None))
         )
+        users_without_roles = list(result.scalars().all())
 
         for user in users_without_roles:
             user.role = "dispatcher"  # Default to dispatcher
             logger.info(f"Updated {user.name} to dispatcher role")
 
-        db.commit()
+        await db.commit()
         logger.info(
             f"Migrated {len(users_without_roles)} users to have dispatcher role"
         )
 
     except Exception as e:
         logger.error(f"Error migrating users: {e}")
-        db.rollback()
+        await db.rollback()

@@ -1,7 +1,9 @@
 # app/db/init_db.py
-from sqlalchemy.orm import Session
-from app.db.models import Company
 import logging
+
+from sqlalchemy.orm import Session
+
+from app.db.models import Company
 
 logger = logging.getLogger(__name__)
 

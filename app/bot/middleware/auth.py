@@ -1,8 +1,11 @@
 # app/bot/middleware/auth.py
-from typing import Callable, Dict, Any, Awaitable
+from collections.abc import Awaitable, Callable
+from typing import Any
+
 from aiogram import BaseMiddleware
-from aiogram.types import Message, CallbackQuery
-from sqlalchemy.orm import Session
+from aiogram.types import CallbackQuery, Message
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.bot.services.user_service import UserService
 
 
@@ -11,11 +14,11 @@ class AuthMiddleware(BaseMiddleware):
 
     async def __call__(
         self,
-        handler: Callable[[Message, Dict[str, Any]], Awaitable[Any]],
+        handler: Callable[[Message, dict[str, Any]], Awaitable[Any]],
         event: Message | CallbackQuery,
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> Any:
-        db: Session = data.get("db")
+        db: AsyncSession = data.get("db")
         if not db:
             return await handler(event, data)
 

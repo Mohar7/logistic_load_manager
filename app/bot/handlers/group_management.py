@@ -1,14 +1,15 @@
 # app/bot/handlers/group_management.py - COMPLETE UNIFIED VERSION
-from aiogram import types, F
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+import logging
+
+from aiogram import types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from sqlalchemy.orm import Session
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.bot.services.chat_service import ChatService
-from app.bot.utils.formatters import escape_markdown
 from app.bot.utils.error_handling import safe_callback_handler, safe_message_handler
-from typing import List, Dict, Any
-import logging
+from app.bot.utils.formatters import escape_markdown
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +139,7 @@ class GroupManagementHandler:
 
     @staticmethod
     @safe_callback_handler
-    async def handle_show_my_chats(callback: CallbackQuery, db: Session):
+    async def handle_show_my_chats(callback: CallbackQuery, db: AsyncSession):
         """Show user's active chats that can be added"""
         try:
             await callback.message.edit_text(
@@ -177,7 +178,7 @@ class GroupManagementHandler:
 
     @staticmethod
     @safe_message_handler
-    async def handle_username_input(message: types.Message, state: FSMContext, db: Session):
+    async def handle_username_input(message: types.Message, state: FSMContext, db: AsyncSession):
         """Handle username input for group addition"""
         if message.text.lower() in ["/cancel", "cancel"]:
             await state.clear()
@@ -192,6 +193,7 @@ class GroupManagementHandler:
 
         try:
             from aiogram import Bot
+
             from app.config import get_settings
 
             settings = get_settings()
@@ -237,7 +239,7 @@ class GroupManagementHandler:
 
                 group_name_escaped = escape_markdown(chat.title)
                 username_escaped = escape_markdown(username)
-                
+
                 confirmation_text = (
                     f"🔍 *Found Group:*\n\n"
                     f"*Name:* {group_name_escaped}\n"
@@ -278,7 +280,7 @@ class GroupManagementHandler:
 
     @staticmethod
     @safe_message_handler
-    async def handle_chat_id_input(message: types.Message, state: FSMContext, db: Session):
+    async def handle_chat_id_input(message: types.Message, state: FSMContext, db: AsyncSession):
         """Handle chat ID input for group addition"""
         if message.text.lower() in ["/cancel", "cancel"]:
             await state.clear()
@@ -289,6 +291,7 @@ class GroupManagementHandler:
             chat_id = int(message.text.strip())
 
             from aiogram import Bot
+
             from app.config import get_settings
 
             settings = get_settings()
@@ -390,7 +393,7 @@ class GroupManagementHandler:
 
     @staticmethod
     @safe_message_handler
-    async def handle_forward_message(message: types.Message, state: FSMContext, db: Session):
+    async def handle_forward_message(message: types.Message, state: FSMContext, db: AsyncSession):
         """Handle forwarded message for group addition"""
         if message.text and message.text.lower() in ["/cancel", "cancel"]:
             await state.clear()
@@ -518,7 +521,7 @@ class GroupManagementHandler:
 
     @staticmethod
     @safe_callback_handler
-    async def handle_confirm_add_group(callback: CallbackQuery, state: FSMContext, db: Session):
+    async def handle_confirm_add_group(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
         """Confirm and add the selected group"""
         try:
             state_data = await state.get_data()

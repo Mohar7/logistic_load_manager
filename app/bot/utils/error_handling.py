@@ -1,7 +1,8 @@
 # app/bot/utils/error_handling.py
 import functools
 import logging
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from aiogram.types import (
     CallbackQuery,

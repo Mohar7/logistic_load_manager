@@ -1,12 +1,15 @@
 # app/services/notification_service.py - Updated for cross-company support
 import logging
-import asyncio
+from typing import Any
+
 import aiohttp
-from typing import Dict, Any, Optional, List
-from sqlalchemy.orm import Session
-from app.db.repositories.load_repository import LoadRepository
-from app.db.models import Driver, TelegramChat, Company
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
 from app.config import get_settings
+from app.db.models import Company, Driver, TelegramChat
+from app.db.repositories.load_repository import LoadRepository
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -17,13 +20,13 @@ class NotificationService:
     Service for sending notifications to drivers via Telegram with cross-company support.
     """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
         self.load_repository = LoadRepository(db)
         self.base_url = "https://api.telegram.org/bot{token}/sendMessage"
 
     async def notify_driver_about_load(
-        self, load_id: int, driver_id: Optional[int] = None
+        self, load_id: int, driver_id: int | None = None
     ) -> bool:
         """
         Notify a driver about a load assignment via Telegram.
@@ -38,7 +41,7 @@ class NotificationService:
         """
         try:
             # Get load information
-            load = self.load_repository.get_load_by_id(load_id)
+            load = await self.load_repository.get_load_by_id(load_id)
             if not load:
                 logger.error(f"Load with ID {load_id} not found")
                 return False
@@ -51,7 +54,12 @@ class NotificationService:
                 )
                 return False
 
-            driver = self.db.query(Driver).filter(Driver.id == target_driver_id).first()
+            result = await self.db.execute(
+                select(Driver)
+                .options(selectinload(Driver.company))
+                .where(Driver.id == target_driver_id)
+            )
+            driver = result.scalar_one_or_none()
             if not driver:
                 logger.error(f"Driver with ID {target_driver_id} not found")
                 return False
@@ -63,11 +71,10 @@ class NotificationService:
                 )
                 return False
 
-            chat = (
-                self.db.query(TelegramChat)
-                .filter(TelegramChat.id == driver.chat_id)
-                .first()
+            result = await self.db.execute(
+                select(TelegramChat).where(TelegramChat.id == driver.chat_id)
             )
+            chat = result.scalar_one_or_none()
             if not chat or not chat.chat_token:
                 logger.error(
                     f"Telegram chat for driver {driver.name} not found or has no token"
@@ -75,7 +82,7 @@ class NotificationService:
                 return False
 
             # Get legs for the load
-            legs = self.load_repository.get_legs_for_load(load_id)
+            legs = await self.load_repository.get_legs_for_load(load_id)
 
             # Create enhanced message with cross-company information
             message = self._create_load_notification_message(load, legs, driver)
@@ -84,7 +91,7 @@ class NotificationService:
             return await self._send_telegram_message(chat.chat_token, message)
 
         except Exception as e:
-            logger.error(f"Error in notify_driver_about_load: {str(e)}")
+            logger.error(f"Error in notify_driver_about_load: {e!s}")
             return False
 
     def _create_load_notification_message(self, load, legs, driver) -> str:
@@ -106,7 +113,7 @@ class NotificationService:
             driver.company_id != load.company_id if load.company_id else False
         )
 
-        message = f"🚚 **NEW LOAD ASSIGNMENT** 🚚\n\n"
+        message = "🚚 **NEW LOAD ASSIGNMENT** 🚚\n\n"
         message += f"Hello **{driver.name}**,\n\n"
         message += f"You have been assigned to load **{load.trip_id}**:\n\n"
 
@@ -120,14 +127,14 @@ class NotificationService:
         message += f"📏 **Distance:** {float(load.distance):,.1f} mi\n\n"
 
         # Add company information for transparency
-        message += f"**📋 Assignment Details:**\n"
+        message += "**📋 Assignment Details:**\n"
         message += f"• **Your Company:** {driver_company}\n"
         message += f"• **Load Company:** {load_company}\n"
 
         if is_cross_company:
-            message += f"• **Type:** Cross-Company Assignment 🔄\n"
+            message += "• **Type:** Cross-Company Assignment 🔄\n"
         else:
-            message += f"• **Type:** Same Company Assignment ✅\n"
+            message += "• **Type:** Same Company Assignment ✅\n"
 
         if legs:
             message += f"\n**📦 Load Details ({len(legs)} legs):**\n"
@@ -139,8 +146,8 @@ class NotificationService:
                 message += f"🕐 {leg.pickup_time_str} - {leg.dropoff_time_str}\n"
                 message += f"📏 {float(leg.distance):,.1f} mi\n"
 
-        message += f"\n**⚠️ Please confirm receipt of this assignment.**\n"
-        message += f"Contact your dispatcher if you have any questions."
+        message += "\n**⚠️ Please confirm receipt of this assignment.**\n"
+        message += "Contact your dispatcher if you have any questions."
 
         return message
 
@@ -183,12 +190,12 @@ class NotificationService:
                         )
                         return False
             except Exception as e:
-                logger.error(f"Error sending Telegram message: {str(e)}")
+                logger.error(f"Error sending Telegram message: {e!s}")
                 return False
 
     async def notify_multiple_drivers(
         self, load_id: int, driver_ids: list
-    ) -> Dict[int, bool]:
+    ) -> dict[int, bool]:
         """
         Notify multiple drivers about a load (useful for cross-company broadcasts).
 
@@ -208,7 +215,7 @@ class NotificationService:
 
     async def broadcast_message_to_all_drivers(
         self, message: str, sender_name: str, filter_by_telegram: bool = True
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Broadcast a message to all drivers across all companies.
 
@@ -222,19 +229,12 @@ class NotificationService:
         """
         try:
             # Get all drivers across all companies
+            stmt = select(Driver).options(selectinload(Driver.company))
             if filter_by_telegram:
-                drivers = (
-                    self.db.query(Driver)
-                    .filter(Driver.chat_id.isnot(None))
-                    .join(Company, Driver.company_id == Company.id, isouter=True)
-                    .all()
-                )
-            else:
-                drivers = (
-                    self.db.query(Driver)
-                    .join(Company, Driver.company_id == Company.id, isouter=True)
-                    .all()
-                )
+                stmt = stmt.where(Driver.chat_id.isnot(None))
+
+            result = await self.db.execute(stmt)
+            drivers = list(result.scalars().all())
 
             sent_count = 0
             failed_count = 0
@@ -245,11 +245,10 @@ class NotificationService:
                     continue
 
                 try:
-                    chat = (
-                        self.db.query(TelegramChat)
-                        .filter(TelegramChat.id == driver.chat_id)
-                        .first()
+                    chat_result = await self.db.execute(
+                        select(TelegramChat).where(TelegramChat.id == driver.chat_id)
                     )
+                    chat = chat_result.scalar_one_or_none()
 
                     if chat and chat.chat_token:
                         company_name = (
@@ -292,7 +291,7 @@ class NotificationService:
             }
 
         except Exception as e:
-            logger.error(f"Error in broadcast_message_to_all_drivers: {str(e)}")
+            logger.error(f"Error in broadcast_message_to_all_drivers: {e!s}")
             return {
                 "sent_count": 0,
                 "failed_count": 0,
@@ -303,7 +302,7 @@ class NotificationService:
 
     async def broadcast_message_to_company(
         self, message: str, sender_name: str, company_id: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Broadcast a message to all drivers in a specific company.
 
@@ -317,7 +316,10 @@ class NotificationService:
         """
         try:
             # Get company info
-            company = self.db.query(Company).filter(Company.id == company_id).first()
+            result = await self.db.execute(
+                select(Company).where(Company.id == company_id)
+            )
+            company = result.scalar_one_or_none()
             if not company:
                 return {
                     "sent_count": 0,
@@ -326,22 +328,22 @@ class NotificationService:
                 }
 
             # Get drivers from specific company with Telegram
-            drivers = (
-                self.db.query(Driver)
-                .filter(Driver.company_id == company_id, Driver.chat_id.isnot(None))
-                .all()
+            result = await self.db.execute(
+                select(Driver).where(
+                    Driver.company_id == company_id, Driver.chat_id.isnot(None)
+                )
             )
+            drivers = list(result.scalars().all())
 
             sent_count = 0
             failed_count = 0
 
             for driver in drivers:
                 try:
-                    chat = (
-                        self.db.query(TelegramChat)
-                        .filter(TelegramChat.id == driver.chat_id)
-                        .first()
+                    chat_result = await self.db.execute(
+                        select(TelegramChat).where(TelegramChat.id == driver.chat_id)
                     )
+                    chat = chat_result.scalar_one_or_none()
 
                     if chat and chat.chat_token:
                         formatted_message = (
@@ -377,7 +379,7 @@ class NotificationService:
             }
 
         except Exception as e:
-            logger.error(f"Error in broadcast_message_to_company: {str(e)}")
+            logger.error(f"Error in broadcast_message_to_company: {e!s}")
             return {"sent_count": 0, "failed_count": 0, "error": str(e)}
 
     async def notify_cross_company_assignment(
@@ -396,8 +398,13 @@ class NotificationService:
         """
         try:
             # Get load and driver info
-            load = self.load_repository.get_load_by_id(load_id)
-            driver = self.db.query(Driver).filter(Driver.id == driver_id).first()
+            load = await self.load_repository.get_load_by_id(load_id)
+            result = await self.db.execute(
+                select(Driver)
+                .options(selectinload(Driver.company))
+                .where(Driver.id == driver_id)
+            )
+            driver = result.scalar_one_or_none()
 
             if not load or not driver:
                 return False
@@ -416,11 +423,10 @@ class NotificationService:
                 logger.warning(f"Driver {driver.name} doesn't have Telegram enabled")
                 return False
 
-            chat = (
-                self.db.query(TelegramChat)
-                .filter(TelegramChat.id == driver.chat_id)
-                .first()
+            result = await self.db.execute(
+                select(TelegramChat).where(TelegramChat.id == driver.chat_id)
             )
+            chat = result.scalar_one_or_none()
 
             if not chat or not chat.chat_token:
                 return False
@@ -450,10 +456,10 @@ class NotificationService:
             return await self._send_telegram_message(chat.chat_token, message)
 
         except Exception as e:
-            logger.error(f"Error in notify_cross_company_assignment: {str(e)}")
+            logger.error(f"Error in notify_cross_company_assignment: {e!s}")
             return False
 
-    async def get_notification_statistics(self) -> Dict[str, Any]:
+    async def get_notification_statistics(self) -> dict[str, Any]:
         """
         Get statistics about notification capabilities across companies.
 
@@ -461,12 +467,11 @@ class NotificationService:
             Dict[str, Any]: Notification statistics
         """
         try:
-            # Get all drivers
-            all_drivers = (
-                self.db.query(Driver)
-                .join(Company, Driver.company_id == Company.id, isouter=True)
-                .all()
+            # Get all drivers (eager-load company so we can read driver.company.name later)
+            result = await self.db.execute(
+                select(Driver).options(selectinload(Driver.company))
             )
+            all_drivers = list(result.scalars().all())
 
             # Get drivers with Telegram
             telegram_drivers = [d for d in all_drivers if d.chat_id]
@@ -498,7 +503,7 @@ class NotificationService:
             }
 
         except Exception as e:
-            logger.error(f"Error getting notification statistics: {str(e)}")
+            logger.error(f"Error getting notification statistics: {e!s}")
             return {
                 "total_drivers": 0,
                 "telegram_enabled_drivers": 0,

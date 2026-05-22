@@ -1,6 +1,7 @@
 # app/bot/utils/keyboards.py
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from typing import List, Dict, Any
+from typing import Any
+
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 
 class BotKeyboards:
@@ -8,7 +9,7 @@ class BotKeyboards:
 
     @staticmethod
     def create_pagination_keyboard(
-        items: List[Dict[str, Any]], current_page: int = 0, items_per_page: int = 5
+        items: list[dict[str, Any]], current_page: int = 0, items_per_page: int = 5
     ) -> InlineKeyboardMarkup:
         """Create a paginated keyboard for long lists"""
         start_idx = current_page * items_per_page

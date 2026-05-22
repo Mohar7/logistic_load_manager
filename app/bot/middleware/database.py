@@ -1,8 +1,11 @@
 # app/bot/middleware/database.py
-from typing import Callable, Dict, Any, Awaitable
+from collections.abc import Awaitable, Callable
+from typing import Any
+
 from aiogram import BaseMiddleware
-from aiogram.types import Message, CallbackQuery
-from app.db.database import SessionLocal
+from aiogram.types import CallbackQuery, Message
+
+from app.db.database import AsyncSessionLocal
 
 
 class DatabaseMiddleware(BaseMiddleware):
@@ -10,18 +13,10 @@ class DatabaseMiddleware(BaseMiddleware):
 
     async def __call__(
         self,
-        handler: Callable[[Message, Dict[str, Any]], Awaitable[Any]],
+        handler: Callable[[Message, dict[str, Any]], Awaitable[Any]],
         event: Message | CallbackQuery,
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> Any:
-        # Create database session
-        db = SessionLocal()
-        data["db"] = db
-
-        try:
-            # Call the handler
-            result = await handler(event, data)
-            return result
-        finally:
-            # Close the session
-            db.close()
+        async with AsyncSessionLocal() as db:
+            data["db"] = db
+            return await handler(event, data)

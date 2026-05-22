@@ -1,23 +1,21 @@
 # app/bot/main.py - Updated with unified management
 import asyncio
 import logging
-from aiogram import Bot, Dispatcher, types, F
+
+from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
-from sqlalchemy.orm import Session
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-# Config and database
-from app.config import get_settings
-from app.db.database import SessionLocal
+from app.bot.handlers.admin import AdminHandler
 
 # Handlers - Updated imports
-from app.bot.handlers.auth import AuthHandler
-from app.bot.handlers.admin import AdminHandler
 from app.bot.handlers.dispatcher import DispatcherHandler, NotificationStates
-from app.bot.handlers.management import UnifiedManagementHandler, ManagementStates
+from app.bot.handlers.management import ManagementStates, UnifiedManagementHandler
 
 # Middleware
 from app.bot.middleware.auth import AuthMiddleware
@@ -28,6 +26,10 @@ from app.bot.services.user_service import UserService
 
 # Utils
 from app.bot.utils.formatters import escape_markdown
+
+# Config and database
+from app.config import get_settings
+from app.db.database import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -97,7 +99,7 @@ def get_main_menu(user_role: str) -> InlineKeyboardMarkup:
 
 
 @dp.message(Command("start"))
-async def start_command(message: types.Message, db: Session, user_data: dict):
+async def start_command(message: types.Message, db: AsyncSession, user_data: dict):
     """Handle /start command"""
     if user_data:
         # User is already registered
@@ -168,7 +170,7 @@ If you need assistance, contact your system administrator.
 
 
 @dp.callback_query(F.data.startswith("register_"))
-async def handle_registration(callback: CallbackQuery, state: FSMContext, db: Session):
+async def handle_registration(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
     """Handle role registration"""
     role = callback.data.split("_")[1]
 
@@ -182,7 +184,7 @@ async def handle_registration(callback: CallbackQuery, state: FSMContext, db: Se
 
 
 @dp.message(StateFilter(RegistrationStates.waiting_for_name))
-async def handle_name_input(message: types.Message, state: FSMContext, db: Session):
+async def handle_name_input(message: types.Message, state: FSMContext, db: AsyncSession):
     """Handle name input during registration"""
     user_service = UserService(db)
     state_data = await state.get_data()
@@ -238,7 +240,7 @@ async def handle_name_input(message: types.Message, state: FSMContext, db: Sessi
 
 
 @dp.callback_query(F.data.startswith("company_"), StateFilter(RegistrationStates.waiting_for_company_selection))
-async def handle_company_selection(callback: CallbackQuery, state: FSMContext, db: Session):
+async def handle_company_selection(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
     """Handle company selection during dispatcher registration"""
     company_id = int(callback.data.split("_")[1])
     state_data = await state.get_data()
@@ -357,7 +359,7 @@ async def handle_manage_groups(callback: CallbackQuery, user_data: dict):
 
 
 @dp.callback_query(F.data == "manage_drivers")
-async def handle_manage_drivers(callback: CallbackQuery, user_data: dict, db: Session):
+async def handle_manage_drivers(callback: CallbackQuery, user_data: dict, db: AsyncSession):
     """Handle driver management menu"""
     if not user_data or user_data["role"] != "manager":
         await callback.answer("Access denied!", show_alert=True)
@@ -367,7 +369,7 @@ async def handle_manage_drivers(callback: CallbackQuery, user_data: dict, db: Se
 
 
 @dp.callback_query(F.data == "manage_users")
-async def handle_manage_users(callback: CallbackQuery, user_data: dict, db: Session):
+async def handle_manage_users(callback: CallbackQuery, user_data: dict, db: AsyncSession):
     """Handle user management"""
     if not user_data or user_data["role"] != "manager":
         await callback.answer("Access denied!", show_alert=True)
@@ -376,7 +378,8 @@ async def handle_manage_users(callback: CallbackQuery, user_data: dict, db: Sess
     try:
         from app.db.models import Dispatchers
 
-        users = db.query(Dispatchers).all()
+        result = await db.execute(select(Dispatchers))
+        users = list(result.scalars().all())
 
         if not users:
             text = "👤 No users found."
@@ -422,7 +425,7 @@ async def handle_manage_users(callback: CallbackQuery, user_data: dict, db: Sess
 
 
 @dp.callback_query(F.data == "manage_companies")
-async def handle_manage_companies(callback: CallbackQuery, user_data: dict, db: Session):
+async def handle_manage_companies(callback: CallbackQuery, user_data: dict, db: AsyncSession):
     """Handle company management"""
     if not user_data or user_data["role"] != "manager":
         await callback.answer("Access denied!", show_alert=True)
@@ -431,13 +434,14 @@ async def handle_manage_companies(callback: CallbackQuery, user_data: dict, db: 
     try:
         from app.db.models import Company
 
-        companies = db.query(Company).all()
+        result = await db.execute(select(Company))
+        companies = list(result.scalars().all())
 
         text = "🏢 *Companies:*\n\n"
         for company in companies:
             company_escaped = escape_markdown(company.name)
             carrier_escaped = escape_markdown(company.carrier_identifier)
-            
+
             text += f"*{company_escaped}*\n"
             text += f"• DOT: {company.usdot}\n"
             text += f"• MC: {company.mc}\n"
@@ -463,7 +467,7 @@ async def handle_manage_companies(callback: CallbackQuery, user_data: dict, db: 
 
 
 @dp.callback_query(F.data == "view_stats")
-async def handle_stats_callback(callback: CallbackQuery, db: Session, user_data: dict):
+async def handle_stats_callback(callback: CallbackQuery, db: AsyncSession, user_data: dict):
     """Handle view statistics callback"""
     if not user_data or user_data["role"] != "manager":
         await callback.answer("Access denied!", show_alert=True)
@@ -492,7 +496,7 @@ async def handle_add_by_forward(callback: CallbackQuery, state: FSMContext):
     await UnifiedManagementHandler.handle_add_by_forward(callback, state)
 
 @dp.callback_query(F.data == "confirm_add_chat")
-async def handle_confirm_add_chat(callback: CallbackQuery, state: FSMContext, db: Session):
+async def handle_confirm_add_chat(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
     await UnifiedManagementHandler.handle_confirm_add_chat(callback, state, db)
 
 @dp.callback_query(F.data == "cancel_add_chat")
@@ -500,7 +504,7 @@ async def handle_cancel_add_chat(callback: CallbackQuery, state: FSMContext):
     await UnifiedManagementHandler.handle_cancel_add_chat(callback, state)
 
 @dp.callback_query(F.data == "list_groups")
-async def handle_list_groups(callback: CallbackQuery, db: Session, user_data: dict):
+async def handle_list_groups(callback: CallbackQuery, db: AsyncSession, user_data: dict):
     await UnifiedManagementHandler.handle_list_groups(callback, db, user_data)
 
 # Driver Management Handlers
@@ -509,11 +513,11 @@ async def handle_add_driver(callback: CallbackQuery, state: FSMContext):
     await UnifiedManagementHandler.handle_add_driver(callback, state)
 
 @dp.callback_query(F.data.startswith("select_company_"))
-async def handle_company_selection_for_driver(callback: CallbackQuery, state: FSMContext, db: Session):
+async def handle_company_selection_for_driver(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
     await UnifiedManagementHandler.handle_company_selection(callback, state, db)
 
 @dp.callback_query(F.data == "confirm_create_driver")
-async def handle_confirm_create_driver(callback: CallbackQuery, state: FSMContext, db: Session):
+async def handle_confirm_create_driver(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
     await UnifiedManagementHandler.handle_confirm_create_driver(callback, state, db)
 
 @dp.callback_query(F.data == "cancel_add_driver")
@@ -521,24 +525,24 @@ async def handle_cancel_add_driver(callback: CallbackQuery, state: FSMContext):
     await UnifiedManagementHandler.handle_cancel_add_driver(callback, state)
 
 @dp.callback_query(F.data == "list_drivers")
-async def handle_list_drivers(callback: CallbackQuery, db: Session):
+async def handle_list_drivers(callback: CallbackQuery, db: AsyncSession):
     await UnifiedManagementHandler.handle_list_drivers(callback, db)
 
 # Driver-Chat Assignment Handlers
 @dp.callback_query(F.data == "assign_driver_to_chat")
-async def handle_assign_driver_to_chat(callback: CallbackQuery, db: Session):
+async def handle_assign_driver_to_chat(callback: CallbackQuery, db: AsyncSession):
     await UnifiedManagementHandler.handle_assign_driver_to_chat(callback, db)
 
 @dp.callback_query(F.data.startswith("select_driver_for_chat_"))
-async def handle_select_driver_for_chat(callback: CallbackQuery, db: Session):
+async def handle_select_driver_for_chat(callback: CallbackQuery, db: AsyncSession):
     await UnifiedManagementHandler.handle_select_driver_for_chat(callback, db)
 
 @dp.callback_query(F.data.startswith("confirm_assign_chat_"))
-async def handle_confirm_assign_chat(callback: CallbackQuery, db: Session):
+async def handle_confirm_assign_chat(callback: CallbackQuery, db: AsyncSession):
     await UnifiedManagementHandler.handle_confirm_assign_chat(callback, db)
 
 @dp.callback_query(F.data.startswith("assign_chat_to_driver_"))
-async def handle_assign_chat_to_specific_driver(callback: CallbackQuery, db: Session):
+async def handle_assign_chat_to_specific_driver(callback: CallbackQuery, db: AsyncSession):
     # Extract driver ID and redirect to chat selection
     driver_id = int(callback.data.split("_")[4])
     # Modify callback data to match expected format
@@ -547,19 +551,19 @@ async def handle_assign_chat_to_specific_driver(callback: CallbackQuery, db: Ses
 
 # Message handlers for management states
 @dp.message(StateFilter(ManagementStates.waiting_for_username))
-async def handle_username_message(message: types.Message, state: FSMContext, db: Session):
+async def handle_username_message(message: types.Message, state: FSMContext, db: AsyncSession):
     await UnifiedManagementHandler.handle_username_input(message, state, db)
 
 @dp.message(StateFilter(ManagementStates.waiting_for_chat_id))
-async def handle_chat_id_message(message: types.Message, state: FSMContext, db: Session):
+async def handle_chat_id_message(message: types.Message, state: FSMContext, db: AsyncSession):
     await UnifiedManagementHandler.handle_chat_id_input(message, state, db)
 
 @dp.message(StateFilter(ManagementStates.waiting_for_forward))
-async def handle_forward_message_input(message: types.Message, state: FSMContext, db: Session):
+async def handle_forward_message_input(message: types.Message, state: FSMContext, db: AsyncSession):
     await UnifiedManagementHandler.handle_forward_message(message, state, db)
 
 @dp.message(StateFilter(ManagementStates.waiting_for_driver_name))
-async def handle_driver_name_message(message: types.Message, state: FSMContext, db: Session):
+async def handle_driver_name_message(message: types.Message, state: FSMContext, db: AsyncSession):
     await UnifiedManagementHandler.handle_driver_name_input(message, state, db)
 
 
@@ -567,27 +571,27 @@ async def handle_driver_name_message(message: types.Message, state: FSMContext, 
 
 
 @dp.callback_query(F.data == "all_loads")
-async def handle_all_loads(callback: CallbackQuery, db: Session, user_data: dict):
+async def handle_all_loads(callback: CallbackQuery, db: AsyncSession, user_data: dict):
     await DispatcherHandler.handle_all_loads(callback, db, user_data)
 
 @dp.callback_query(F.data == "unassigned_loads")
-async def handle_unassigned_loads(callback: CallbackQuery, db: Session, user_data: dict):
+async def handle_unassigned_loads(callback: CallbackQuery, db: AsyncSession, user_data: dict):
     await DispatcherHandler.handle_unassigned_loads(callback, db, user_data)
 
 @dp.callback_query(F.data == "all_drivers")
-async def handle_all_drivers(callback: CallbackQuery, db: Session, user_data: dict):
+async def handle_all_drivers(callback: CallbackQuery, db: AsyncSession, user_data: dict):
     await DispatcherHandler.handle_all_drivers(callback, db, user_data)
 
 @dp.callback_query(F.data == "all_companies")
-async def handle_all_companies(callback: CallbackQuery, db: Session, user_data: dict):
+async def handle_all_companies(callback: CallbackQuery, db: AsyncSession, user_data: dict):
     await DispatcherHandler.handle_all_companies(callback, db, user_data)
 
 @dp.callback_query(F.data.startswith("company_details_"))
-async def handle_company_details(callback: CallbackQuery, db: Session):
+async def handle_company_details(callback: CallbackQuery, db: AsyncSession):
     await DispatcherHandler.handle_company_details(callback, db)
 
 @dp.callback_query(F.data == "system_stats")
-async def handle_system_stats(callback: CallbackQuery, db: Session, user_data: dict):
+async def handle_system_stats(callback: CallbackQuery, db: AsyncSession, user_data: dict):
     await DispatcherHandler.handle_system_stats(callback, db, user_data)
 
 @dp.callback_query(F.data == "send_notifications")
@@ -595,7 +599,7 @@ async def handle_send_notifications(callback: CallbackQuery, user_data: dict):
     await DispatcherHandler.handle_send_notifications(callback, user_data)
 
 @dp.callback_query(F.data == "send_to_driver")
-async def handle_send_to_driver(callback: CallbackQuery, user_data: dict, db: Session):
+async def handle_send_to_driver(callback: CallbackQuery, user_data: dict, db: AsyncSession):
     await DispatcherHandler.handle_send_to_driver(callback, user_data, db)
 
 
@@ -603,31 +607,31 @@ async def handle_send_to_driver(callback: CallbackQuery, user_data: dict, db: Se
 
 
 @dp.callback_query(F.data.startswith("view_load_"))
-async def handle_view_load(callback: CallbackQuery, db: Session):
+async def handle_view_load(callback: CallbackQuery, db: AsyncSession):
     await DispatcherHandler.handle_load_details(callback, db)
 
 @dp.callback_query(F.data.startswith("assign_driver_"))
-async def handle_assign_driver_callback(callback: CallbackQuery, db: Session):
+async def handle_assign_driver_callback(callback: CallbackQuery, db: AsyncSession):
     await DispatcherHandler.handle_assign_driver(callback, db)
 
 @dp.callback_query(F.data.startswith("filter_company_"))
-async def handle_filter_company_callback(callback: CallbackQuery, db: Session):
+async def handle_filter_company_callback(callback: CallbackQuery, db: AsyncSession):
     await DispatcherHandler.handle_filter_by_company(callback, db)
 
 @dp.callback_query(F.data.startswith("company_drivers_"))
-async def handle_company_drivers_callback(callback: CallbackQuery, db: Session):
+async def handle_company_drivers_callback(callback: CallbackQuery, db: AsyncSession):
     await DispatcherHandler.handle_company_drivers(callback, db)
 
 @dp.callback_query(F.data.startswith("show_more_drivers_"))
-async def handle_show_more_drivers_callback(callback: CallbackQuery, db: Session):
+async def handle_show_more_drivers_callback(callback: CallbackQuery, db: AsyncSession):
     await DispatcherHandler.handle_show_more_drivers(callback, db)
 
 @dp.callback_query(F.data.startswith("select_driver_"))
-async def handle_select_driver(callback: CallbackQuery, db: Session):
+async def handle_select_driver(callback: CallbackQuery, db: AsyncSession):
     await DispatcherHandler.handle_driver_selection(callback, db)
 
 @dp.callback_query(F.data.startswith("notify_driver_"))
-async def handle_notify_driver_callback(callback: CallbackQuery, db: Session):
+async def handle_notify_driver_callback(callback: CallbackQuery, db: AsyncSession):
     await DispatcherHandler.handle_notify_driver(callback, db)
 
 @dp.callback_query(F.data == "broadcast_message")
@@ -639,7 +643,7 @@ async def handle_broadcast_all_drivers_callback(callback: CallbackQuery, state: 
     await DispatcherHandler.handle_broadcast_all_drivers(callback, state)
 
 @dp.callback_query(F.data == "broadcast_by_company")
-async def handle_broadcast_by_company_callback(callback: CallbackQuery, state: FSMContext, db: Session):
+async def handle_broadcast_by_company_callback(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
     await DispatcherHandler.handle_broadcast_by_company(callback, state, db)
 
 @dp.callback_query(F.data == "broadcast_telegram_only")
@@ -651,7 +655,7 @@ async def handle_broadcast_company_callback(callback: CallbackQuery, state: FSMC
     await DispatcherHandler.handle_company_broadcast_selection(callback, state)
 
 @dp.message(StateFilter(NotificationStates.waiting_for_message))
-async def handle_broadcast_input(message: types.Message, state: FSMContext, db: Session, user_data: dict):
+async def handle_broadcast_input(message: types.Message, state: FSMContext, db: AsyncSession, user_data: dict):
     await DispatcherHandler.handle_broadcast_message_input(message, state, db, user_data)
 
 
@@ -714,12 +718,13 @@ async def main():
 
         # Test database connection
         try:
-            db = SessionLocal()
             from app.db.models import Dispatchers
 
-            user_count = db.query(Dispatchers).count()
+            async with AsyncSessionLocal() as db:
+                user_count = (
+                    await db.execute(select(func.count()).select_from(Dispatchers))
+                ).scalar_one()
             logger.info(f"Database connected successfully. Users in system: {user_count}")
-            db.close()
         except Exception as db_error:
             logger.error(f"Database connection error: {db_error}")
             raise
@@ -792,11 +797,12 @@ async def test_integrations():
         logger.info(f"✅ Bot token valid: @{me.username}")
 
         # Test database
-        db = SessionLocal()
         from app.db.models import Company
 
-        company_count = db.query(Company).count()
-        db.close()
+        async with AsyncSessionLocal() as db:
+            company_count = (
+                await db.execute(select(func.count()).select_from(Company))
+            ).scalar_one()
         logger.info(f"✅ Database connection valid: {company_count} companies")
 
         return True
@@ -809,7 +815,6 @@ async def test_integrations():
 # ===================== MAIN EXECUTION =====================
 
 if __name__ == "__main__":
-    import os
 
     # Setup logging
     setup_logging()

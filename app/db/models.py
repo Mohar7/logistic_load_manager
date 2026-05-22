@@ -1,19 +1,18 @@
 # app/db/models.py - Updated to handle facility names and IDs
 from sqlalchemy import (
-    Column,
-    Integer,
-    String,
-    ForeignKey,
-    DateTime,
-    Numeric,
-    Boolean,
-    Text,
     BIGINT,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
 )
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
-Base = declarative_base()
+from app.db.database import Base
 
 
 class Facility(Base):

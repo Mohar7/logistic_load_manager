@@ -1,7 +1,7 @@
 # app/bot/utils/formatters.py
-from datetime import datetime
-from typing import Dict, Any
-from app.db.models import Load, Leg, Driver
+from typing import Any
+
+from app.db.models import Driver, Load
 
 
 def escape_markdown(text: str) -> str:
@@ -80,7 +80,7 @@ class MessageFormatters:
             driver_name = escape_markdown(str(load.assigned_driver))
             text += f"*Driver:* {driver_name}\n"
         else:
-            text += f"*Driver:* Not assigned\n"
+            text += "*Driver:* Not assigned\n"
 
         if load.is_team_load:
             text += "*Type:* Team Load\n"
@@ -137,7 +137,7 @@ class MessageFormatters:
         return text
 
     @staticmethod
-    def format_system_stats(stats: Dict[str, Any]) -> str:
+    def format_system_stats(stats: dict[str, Any]) -> str:
         """Format system-wide statistics"""
         text = "📊 *System Statistics*\n\n"
 

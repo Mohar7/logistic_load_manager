@@ -1,20 +1,21 @@
 # app/bot/handlers/dispatcher.py - Updated for cross-company access
+import logging
+from collections import defaultdict
+
 from aiogram import types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from sqlalchemy.orm import Session
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.bot.services.load_service import LoadBotService
-from app.services.notification_service import NotificationService
-from app.bot.utils.formatters import escape_markdown
 from app.bot.utils.error_handling import (
-    safe_callback_handler,
     CallbackDataValidator,
-    UserPermissionChecker,
-    truncate_text
+    safe_callback_handler,
 )
-from collections import defaultdict
-import logging
+from app.bot.utils.formatters import escape_markdown
+from app.services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class DispatcherHandler:
 
     @staticmethod
     @safe_callback_handler
-    async def handle_all_loads(callback: types.CallbackQuery, db: Session, user_data: dict):
+    async def handle_all_loads(callback: types.CallbackQuery, db: AsyncSession, user_data: dict):
         """Handle all loads view for dispatchers"""
         if not user_data or user_data["role"] != "dispatcher":
             await callback.answer("Access denied!", show_alert=True)
@@ -52,17 +53,17 @@ class DispatcherHandler:
         else:
             text = f"📋 All Loads ({len(loads)}):\n\n"
             keyboard_buttons = []
-            
+
             for load in loads[:10]:  # Show first 10
                 company_name = load.company.name if load.company else "No Company"
                 status = "✅ Assigned" if load.assigned_driver else "⏳ Unassigned"
-                
+
                 # Escape special characters to prevent markdown issues
                 trip_id = escape_markdown(str(load.trip_id))
                 company_escaped = escape_markdown(company_name)
                 pickup_escaped = escape_markdown(str(load.pickup_address))
                 dropoff_escaped = escape_markdown(str(load.dropoff_address))
-                
+
                 text += f"🚛 *{trip_id}* ({company_escaped})\n"
                 text += f"📍 {pickup_escaped} → {dropoff_escaped}\n"
                 text += f"💰 ${float(load.rate):,.2f} | {status}\n"
@@ -100,14 +101,14 @@ class DispatcherHandler:
 
     @staticmethod
     @safe_callback_handler
-    async def handle_assign_driver(callback: types.CallbackQuery, db: Session):
+    async def handle_assign_driver(callback: types.CallbackQuery, db: AsyncSession):
         """Handle driver assignment to load - UPDATED FOR ALL DRIVERS"""
         # Validate callback data
         is_valid, parts = CallbackDataValidator.validate_callback_data(callback.data, 3, "assign_driver")
         if not is_valid:
             await callback.answer("Invalid request data!", show_alert=True)
             return
-            
+
         load_id = CallbackDataValidator.safe_int_conversion(parts[2])
         if load_id <= 0:
             await callback.answer("Invalid load ID!", show_alert=True)
@@ -162,11 +163,11 @@ class DispatcherHandler:
             for driver in company_drivers[:5]:  # Limit per company to prevent overflow
                 if total_shown >= 15:  # Total limit
                     break
-                    
+
                 driver_text = f"👤 {driver.name}"
                 if driver.chat_id:
                     driver_text += " 📱"  # Telegram available
-                
+
                 # Show company if multiple companies
                 if len(drivers_by_company) > 1:
                     driver_text += f" ({company_name})"
@@ -210,10 +211,10 @@ class DispatcherHandler:
         await callback.answer()
 
     @staticmethod
-    async def handle_filter_by_company(callback: types.CallbackQuery, db: Session):
+    async def handle_filter_by_company(callback: types.CallbackQuery, db: AsyncSession):
         """Handle filtering drivers by company"""
         load_id = int(callback.data.split("_")[2])
-        
+
         load_service = LoadBotService(db)
         companies = await load_service.get_all_companies()
 
@@ -227,7 +228,7 @@ class DispatcherHandler:
             company_drivers = await load_service.get_drivers_by_company(company.id)
             driver_count = len(company_drivers)
             telegram_count = sum(1 for d in company_drivers if d.chat_id)
-            
+
             button_text = f"🏢 {company.name} ({driver_count} drivers"
             if telegram_count > 0:
                 button_text += f", {telegram_count} 📱"
@@ -249,14 +250,14 @@ class DispatcherHandler:
         ])
 
         await callback.message.edit_text(
-            f"🏢 *Select Company:*\n\nChoose a company to view its drivers:",
+            "🏢 *Select Company:*\n\nChoose a company to view its drivers:",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard_buttons),
             parse_mode="Markdown",
         )
         await callback.answer()
 
     @staticmethod
-    async def handle_company_drivers(callback: types.CallbackQuery, db: Session):
+    async def handle_company_drivers(callback: types.CallbackQuery, db: AsyncSession):
         """Handle showing drivers from specific company"""
         parts = callback.data.split("_")
         load_id = int(parts[2])
@@ -306,7 +307,7 @@ class DispatcherHandler:
         await callback.answer()
 
     @staticmethod
-    async def handle_load_details(callback: types.CallbackQuery, db: Session):
+    async def handle_load_details(callback: types.CallbackQuery, db: AsyncSession):
         """Show detailed load information"""
         load_id = int(callback.data.split("_")[2])
 
@@ -339,8 +340,16 @@ class DispatcherHandler:
 
         if load.assigned_driver:
             # Get driver details to show company
+            from sqlalchemy.orm import selectinload
+
             from app.db.models import Driver
-            driver = db.query(Driver).filter(Driver.id == load.driver_id).first()
+            driver = (
+                await db.execute(
+                    select(Driver)
+                    .options(selectinload(Driver.company))
+                    .where(Driver.id == load.driver_id)
+                )
+            ).scalar_one_or_none()
             driver_company = driver.company.name if driver and driver.company else "Unknown"
             driver_escaped = escape_markdown(str(load.assigned_driver))
             company_escaped = escape_markdown(driver_company)
@@ -385,28 +394,28 @@ class DispatcherHandler:
 
     @staticmethod
     @safe_callback_handler
-    async def handle_driver_selection(callback: types.CallbackQuery, db: Session):
+    async def handle_driver_selection(callback: types.CallbackQuery, db: AsyncSession):
         """Handle driver selection for load assignment - UPDATED FOR CROSS-COMPANY"""
         # Validate callback data
         is_valid, parts = CallbackDataValidator.validate_callback_data(callback.data, 4, "select_driver")
         if not is_valid:
             await callback.answer("Invalid request data!", show_alert=True)
             return
-            
+
         load_id = CallbackDataValidator.safe_int_conversion(parts[2])
         driver_id = CallbackDataValidator.safe_int_conversion(parts[3])
-        
+
         if load_id <= 0 or driver_id <= 0:
             await callback.answer("Invalid load or driver ID!", show_alert=True)
             return
 
         try:
             load_service = LoadBotService(db)
-            
+
             # Get driver and load info
             from app.db.repositories.driver_repository import DriverRepository
             driver_repo = DriverRepository(db)
-            driver = driver_repo.get_driver_by_id(driver_id)
+            driver = await driver_repo.get_driver_by_id(driver_id)
             load_data = await load_service.get_load_details(load_id)
 
             if not driver or not load_data:
@@ -414,35 +423,35 @@ class DispatcherHandler:
                 return
 
             load = load_data["load"]
-            
+
             # Check if this is a cross-company assignment
             is_cross_company = driver.company_id != load.company_id if load.company_id else False
-            
+
             # Update load with driver assignment using the load service
             success = await load_service.assign_driver_to_load(load_id, driver_id)
-            
+
             if success:
                 assignment_type = "Cross-company" if is_cross_company else "Same company"
                 driver_company = driver.company.name if driver.company else "No Company"
                 load_company = load.company.name if load.company else "No Company"
-                
+
                 driver_escaped = escape_markdown(driver.name)
                 driver_company_escaped = escape_markdown(driver_company)
                 load_company_escaped = escape_markdown(load_company)
                 trip_id_escaped = escape_markdown(str(load.trip_id))
-                
-                success_message = f"✅ *Driver Assigned Successfully!*\n\n"
+
+                success_message = "✅ *Driver Assigned Successfully!*\n\n"
                 success_message += f"*Driver:* {driver_escaped}\n"
                 success_message += f"*Driver Company:* {driver_company_escaped}\n"
                 success_message += f"*Load:* {trip_id_escaped}\n"
                 success_message += f"*Load Company:* {load_company_escaped}\n"
                 success_message += f"*Assignment Type:* {assignment_type}\n"
-                
+
                 if is_cross_company:
-                    success_message += f"\n🔄 This is a cross-company assignment!"
+                    success_message += "\n🔄 This is a cross-company assignment!"
 
                 keyboard_buttons = []
-                
+
                 # Add notification button if driver has Telegram
                 if driver.chat_id:
                     keyboard_buttons.append([
@@ -452,7 +461,7 @@ class DispatcherHandler:
                         )
                     ])
                 else:
-                    success_message += f"\n⚠️ Driver doesn't have Telegram notifications set up"
+                    success_message += "\n⚠️ Driver doesn't have Telegram notifications set up"
 
                 keyboard_buttons.extend([
                     [
@@ -483,7 +492,7 @@ class DispatcherHandler:
         await callback.answer()
 
     @staticmethod
-    async def handle_notify_driver(callback: types.CallbackQuery, db: Session):
+    async def handle_notify_driver(callback: types.CallbackQuery, db: AsyncSession):
         """Handle sending notification to driver"""
         load_id = int(callback.data.split("_")[2])
 
@@ -549,7 +558,7 @@ class DispatcherHandler:
         """Handle broadcast to all drivers across all companies"""
         await state.update_data(broadcast_type="all_drivers")
         await state.set_state(NotificationStates.waiting_for_message)
-        
+
         await callback.message.edit_text(
             "*Broadcast to All Drivers*\n\n"
             "Enter the message you want to send to *all drivers across all companies*:\n\n"
@@ -559,7 +568,7 @@ class DispatcherHandler:
         await callback.answer()
 
     @staticmethod
-    async def handle_broadcast_by_company(callback: types.CallbackQuery, state: FSMContext, db: Session):
+    async def handle_broadcast_by_company(callback: types.CallbackQuery, state: FSMContext, db: AsyncSession):
         """Handle broadcast by company selection"""
         load_service = LoadBotService(db)
         companies = await load_service.get_all_companies()
@@ -572,7 +581,7 @@ class DispatcherHandler:
         for company in companies:
             company_drivers = await load_service.get_drivers_by_company(company.id)
             telegram_drivers = sum(1 for d in company_drivers if d.chat_id)
-            
+
             button_text = f"🏢 {company.name} ({telegram_drivers} drivers)"
             keyboard_buttons.append([
                 InlineKeyboardButton(
@@ -599,7 +608,7 @@ class DispatcherHandler:
         """Handle broadcast to only Telegram-enabled drivers"""
         await state.update_data(broadcast_type="telegram_only")
         await state.set_state(NotificationStates.waiting_for_message)
-        
+
         await callback.message.edit_text(
             "*Broadcast to Telegram-Enabled Drivers*\n\n"
             "Enter the message you want to send to *all drivers with Telegram notifications* (across all companies):",
@@ -611,21 +620,20 @@ class DispatcherHandler:
     async def handle_company_broadcast_selection(callback: types.CallbackQuery, state: FSMContext):
         """Handle company selection for broadcast"""
         company_id = int(callback.data.split("_")[2])
-        
+
         await state.update_data(broadcast_type="company", company_id=company_id)
         await state.set_state(NotificationStates.waiting_for_message)
-        
+
         # Get company name for confirmation
+        from app.db.database import AsyncSessionLocal
         from app.db.models import Company
-        from app.db.database import SessionLocal
-        
-        db = SessionLocal()
-        try:
-            company = db.query(Company).filter(Company.id == company_id).first()
+
+        async with AsyncSessionLocal() as db:
+            company = (
+                await db.execute(select(Company).where(Company.id == company_id))
+            ).scalar_one_or_none()
             company_name = company.name if company else "Unknown Company"
-        finally:
-            db.close()
-        
+
         company_escaped = escape_markdown(company_name)
         await callback.message.edit_text(
             f"*Broadcast to {company_escaped}*\n\n"
@@ -636,7 +644,7 @@ class DispatcherHandler:
 
     @staticmethod
     async def handle_broadcast_message_input(
-        message: types.Message, state: FSMContext, db: Session, user_data: dict
+        message: types.Message, state: FSMContext, db: AsyncSession, user_data: dict
     ):
         """Handle broadcast message input - UPDATED FOR CROSS-COMPANY"""
         if user_data["role"] != "dispatcher":
@@ -649,28 +657,42 @@ class DispatcherHandler:
         company_id = state_data.get("company_id")
 
         try:
-            from app.db.models import Driver, TelegramChat
             from aiogram import Bot
+            from sqlalchemy.orm import selectinload
+
             from app.config import get_settings
+            from app.db.models import Driver, TelegramChat
 
             settings = get_settings()
             bot = Bot(token=settings.telegram_bot_token)
 
             # Get drivers based on broadcast type
             if broadcast_type == "company" and company_id:
-                drivers_query = db.query(Driver).filter(
-                    Driver.company_id == company_id,
-                    Driver.chat_id.isnot(None)
+                drivers_stmt = (
+                    select(Driver)
+                    .options(selectinload(Driver.company))
+                    .where(
+                        Driver.company_id == company_id,
+                        Driver.chat_id.isnot(None),
+                    )
                 )
-                scope_text = f"company drivers"
+                scope_text = "company drivers"
             elif broadcast_type == "telegram_only":
-                drivers_query = db.query(Driver).filter(Driver.chat_id.isnot(None))
+                drivers_stmt = (
+                    select(Driver)
+                    .options(selectinload(Driver.company))
+                    .where(Driver.chat_id.isnot(None))
+                )
                 scope_text = "Telegram-enabled drivers (all companies)"
             else:  # all_drivers
-                drivers_query = db.query(Driver).filter(Driver.chat_id.isnot(None))
+                drivers_stmt = (
+                    select(Driver)
+                    .options(selectinload(Driver.company))
+                    .where(Driver.chat_id.isnot(None))
+                )
                 scope_text = "all drivers (all companies)"
 
-            drivers_with_chats = drivers_query.all()
+            drivers_with_chats = list((await db.execute(drivers_stmt)).scalars().all())
 
             sent_count = 0
             failed_count = 0
@@ -679,10 +701,10 @@ class DispatcherHandler:
             for driver in drivers_with_chats:
                 try:
                     chat = (
-                        db.query(TelegramChat)
-                        .filter(TelegramChat.id == driver.chat_id)
-                        .first()
-                    )
+                        await db.execute(
+                            select(TelegramChat).where(TelegramChat.id == driver.chat_id)
+                        )
+                    ).scalar_one_or_none()
                     if chat and chat.chat_token:
                         # Include company info in message for cross-company context
                         company_name = driver.company.name if driver.company else "No Company"
@@ -704,11 +726,11 @@ class DispatcherHandler:
                     failed_count += 1
 
             # Create detailed results message
-            result_message = f"*Broadcast Completed!*\n\n"
+            result_message = "*Broadcast Completed!*\n\n"
             result_message += f"*Scope:* {scope_text}\n"
             result_message += f"*✅ Sent:* {sent_count}\n"
             result_message += f"*❌ Failed:* {failed_count}\n\n"
-            
+
             if company_breakdown:
                 result_message += "*📊 Company Breakdown:*\n"
                 for company, count in sorted(company_breakdown.items()):
@@ -724,7 +746,7 @@ class DispatcherHandler:
         await state.clear()
 
     @staticmethod
-    async def handle_show_more_drivers(callback: types.CallbackQuery, db: Session):
+    async def handle_show_more_drivers(callback: types.CallbackQuery, db: AsyncSession):
         """Handle showing more drivers with pagination"""
         parts = callback.data.split("_")
         load_id = int(parts[3])
@@ -735,13 +757,13 @@ class DispatcherHandler:
 
         # Show next batch of drivers
         drivers_to_show = all_drivers[offset:offset + 15]
-        
+
         if not drivers_to_show:
             await callback.answer("No more drivers to show!", show_alert=True)
             return
 
         keyboard_buttons = []
-        
+
         # Group by company for this batch
         drivers_by_company = defaultdict(list)
         for driver in drivers_to_show:
@@ -816,7 +838,7 @@ class DispatcherHandler:
         await callback.answer()
 
     @staticmethod
-    async def handle_unassigned_loads(callback: types.CallbackQuery, db: Session, user_data: dict):
+    async def handle_unassigned_loads(callback: types.CallbackQuery, db: AsyncSession, user_data: dict):
         """Handle unassigned loads view"""
         if not user_data or user_data["role"] != "dispatcher":
             await callback.answer("Access denied!", show_alert=True)
@@ -838,16 +860,16 @@ class DispatcherHandler:
         else:
             text = f"⏳ Unassigned Loads ({len(unassigned_loads)}):\n\n"
             keyboard_buttons = []
-            
+
             for load in unassigned_loads:
                 company_name = load.company.name if load.company else "No Company"
-                
+
                 # Escape special characters
                 trip_id = escape_markdown(str(load.trip_id))
                 company_escaped = escape_markdown(company_name)
                 pickup_escaped = escape_markdown(str(load.pickup_address))
                 dropoff_escaped = escape_markdown(str(load.dropoff_address))
-                
+
                 text += f"🚛 *{trip_id}* ({company_escaped})\n"
                 text += f"📍 {pickup_escaped} → {dropoff_escaped}\n"
                 text += f"💰 ${float(load.rate):,.2f}\n"
@@ -873,7 +895,7 @@ class DispatcherHandler:
         await callback.answer()
 
     @staticmethod
-    async def handle_all_drivers(callback: types.CallbackQuery, db: Session, user_data: dict):
+    async def handle_all_drivers(callback: types.CallbackQuery, db: AsyncSession, user_data: dict):
         """Handle all drivers view across companies"""
         if not user_data or user_data["role"] != "dispatcher":
             await callback.answer("Access denied!", show_alert=True)
@@ -893,30 +915,30 @@ class DispatcherHandler:
             )
         else:
             text = f"👥 All Drivers ({len(drivers_info)}):\n\n"
-            
+
             # Group by company for display
             current_company = None
             telegram_count = 0
-            
+
             for driver_info in drivers_info[:20]:  # Show first 20
                 driver = driver_info["driver"]
                 company_name = driver_info["company_name"]
-                
+
                 if company_name != current_company:
                     if current_company is not None:
                         text += "\n"
                     company_escaped = escape_markdown(company_name)
                     text += f"*🏢 {company_escaped}:*\n"
                     current_company = company_name
-                
+
                 telegram_indicator = " 📱" if driver_info["has_telegram"] else ""
                 driver_escaped = escape_markdown(driver.name)
                 text += f"• {driver_escaped}{telegram_indicator}\n"
-                
+
                 if driver_info["has_telegram"]:
                     telegram_count += 1
 
-            text += f"\n*📊 Summary:*\n"
+            text += "\n*📊 Summary:*\n"
             text += f"• Total Drivers: {len(drivers_info)}\n"
             text += f"• With Telegram: {telegram_count}\n"
             text += f"• Companies: {len(set(d['company_name'] for d in drivers_info))}\n"
@@ -938,7 +960,7 @@ class DispatcherHandler:
         await callback.answer()
 
     @staticmethod
-    async def handle_all_companies(callback: types.CallbackQuery, db: Session, user_data: dict):
+    async def handle_all_companies(callback: types.CallbackQuery, db: AsyncSession, user_data: dict):
         """Handle all companies view"""
         if not user_data or user_data["role"] != "dispatcher":
             await callback.answer("Access denied!", show_alert=True)
@@ -959,11 +981,11 @@ class DispatcherHandler:
         else:
             text = f"🏢 All Companies ({len(company_stats)}):\n\n"
             keyboard_buttons = []
-            
+
             for stat in company_stats:
                 company = stat["company"]
                 company_escaped = escape_markdown(company.name)
-                
+
                 text += f"*{company_escaped}*\n"
                 text += f"• Drivers: {stat['total_drivers']} ({stat['drivers_with_telegram']} 📱)\n"
                 text += f"• Loads: {stat['total_loads']} ({stat['unassigned_loads']} unassigned)\n"
@@ -990,25 +1012,25 @@ class DispatcherHandler:
 
     @staticmethod
     @safe_callback_handler
-    async def handle_company_details(callback: types.CallbackQuery, db: Session):
+    async def handle_company_details(callback: types.CallbackQuery, db: AsyncSession):
         """Handle company details view"""
         # Validate callback data
         is_valid, parts = CallbackDataValidator.validate_callback_data(callback.data, 3, "company_details")
         if not is_valid:
             await callback.answer("Invalid request data!", show_alert=True)
             return
-            
+
         company_id = CallbackDataValidator.safe_int_conversion(parts[2])
         if company_id <= 0:
             await callback.answer("Invalid company ID!", show_alert=True)
             return
-        
+
         load_service = LoadBotService(db)
-        
+
         # Get company details
         companies = await load_service.get_all_companies()
         company = next((c for c in companies if c.id == company_id), None)
-        
+
         if not company:
             await callback.answer("Company not found!", show_alert=True)
             return
@@ -1016,31 +1038,31 @@ class DispatcherHandler:
         # Get company drivers and loads
         drivers = await load_service.get_drivers_by_company(company_id)
         loads = await load_service.get_loads_by_company(company_id)
-        
+
         drivers_with_telegram = sum(1 for d in drivers if d.chat_id)
         unassigned_loads = sum(1 for l in loads if not l.driver_id)
 
         company_escaped = escape_markdown(company.name)
-        
+
         text = f"🏢 *{company_escaped} Details*\n\n"
-        text += f"*Company Info:*\n"
+        text += "*Company Info:*\n"
         text += f"• DOT Number: {company.usdot}\n"
         text += f"• MC Number: {company.mc}\n"
         text += f"• Carrier ID: {escape_markdown(company.carrier_identifier)}\n\n"
-        
-        text += f"*Statistics:*\n"
+
+        text += "*Statistics:*\n"
         text += f"• Total Drivers: {len(drivers)}\n"
         text += f"• Telegram-Enabled: {drivers_with_telegram}\n"
         text += f"• Total Loads: {len(loads)}\n"
         text += f"• Unassigned Loads: {unassigned_loads}\n\n"
-        
+
         if drivers:
-            text += f"*Recent Drivers:*\n"
+            text += "*Recent Drivers:*\n"
             for driver in drivers[:5]:
                 telegram_indicator = " 📱" if driver.chat_id else ""
                 driver_escaped = escape_markdown(driver.name)
                 text += f"• {driver_escaped}{telegram_indicator}\n"
-            
+
             if len(drivers) > 5:
                 text += f"... and {len(drivers) - 5} more\n"
 
@@ -1072,23 +1094,29 @@ class DispatcherHandler:
         await callback.answer()
 
     @staticmethod
-    async def handle_system_stats(callback: types.CallbackQuery, db: Session, user_data: dict):
+    async def handle_system_stats(callback: types.CallbackQuery, db: AsyncSession, user_data: dict):
         """Handle system statistics view"""
         if not user_data or user_data["role"] != "dispatcher":
             await callback.answer("Access denied!", show_alert=True)
             return
 
         try:
-            from app.db.models import Load, Driver, Company, Dispatchers
+            from app.db.models import Company, Dispatchers, Driver, Load
 
-            total_loads = db.query(Load).count()
-            total_drivers = db.query(Driver).count()
-            total_companies = db.query(Company).count()
-            total_dispatchers = db.query(Dispatchers).count()
+            total_loads = (await db.execute(select(func.count()).select_from(Load))).scalar_one()
+            total_drivers = (await db.execute(select(func.count()).select_from(Driver))).scalar_one()
+            total_companies = (await db.execute(select(func.count()).select_from(Company))).scalar_one()
+            total_dispatchers = (await db.execute(select(func.count()).select_from(Dispatchers))).scalar_one()
 
-            unassigned_loads = db.query(Load).filter(Load.driver_id.is_(None)).count()
-            assigned_loads = db.query(Load).filter(Load.driver_id.isnot(None)).count()
-            telegram_drivers = db.query(Driver).filter(Driver.chat_id.isnot(None)).count()
+            unassigned_loads = (await db.execute(
+                select(func.count()).select_from(Load).where(Load.driver_id.is_(None))
+            )).scalar_one()
+            assigned_loads = (await db.execute(
+                select(func.count()).select_from(Load).where(Load.driver_id.isnot(None))
+            )).scalar_one()
+            telegram_drivers = (await db.execute(
+                select(func.count()).select_from(Driver).where(Driver.chat_id.isnot(None))
+            )).scalar_one()
 
             stats_text = f"""
 📊 *System Statistics*
@@ -1144,16 +1172,24 @@ class DispatcherHandler:
         await callback.answer()
 
     @staticmethod
-    async def handle_send_to_driver(callback: types.CallbackQuery, user_data: dict, db: Session):
+    async def handle_send_to_driver(callback: types.CallbackQuery, user_data: dict, db: AsyncSession):
         """Handle send message to specific driver"""
         if not user_data or user_data["role"] != "dispatcher":
             await callback.answer("Access denied!", show_alert=True)
             return
 
         try:
+            from sqlalchemy.orm import selectinload
+
             from app.db.models import Driver
 
-            drivers = db.query(Driver).filter(Driver.chat_id.isnot(None)).all()
+            drivers = list((
+                await db.execute(
+                    select(Driver)
+                    .options(selectinload(Driver.company))
+                    .where(Driver.chat_id.isnot(None))
+                )
+            ).scalars().all())
 
             if not drivers:
                 await callback.message.edit_text(
@@ -1176,7 +1212,7 @@ class DispatcherHandler:
                     company_name = driver.company.name if driver.company else "No Company"
                     driver_escaped = escape_markdown(driver.name)
                     company_escaped = escape_markdown(company_name)
-                    
+
                     text += f"• {driver_escaped} ({company_escaped})\n"
                     keyboard_buttons.append(
                         [
@@ -1218,7 +1254,7 @@ class DispatcherHandler:
         await callback.answer()
 
     @staticmethod
-    async def handle_assign_driver(callback: types.CallbackQuery, db: Session):
+    async def handle_assign_driver(callback: types.CallbackQuery, db: AsyncSession):
         """Handle driver assignment to load - UPDATED FOR CROSS-COMPANY ACCESS"""
         load_id = int(callback.data.split("_")[2])
 
@@ -1271,11 +1307,11 @@ class DispatcherHandler:
             for driver in company_drivers[:5]:  # Limit per company to prevent overflow
                 if total_shown >= 15:  # Total limit
                     break
-                    
+
                 driver_text = f"👤 {driver.name}"
                 if driver.chat_id:
                     driver_text += " 📱"  # Telegram available
-                
+
                 # Show company if multiple companies
                 if len(drivers_by_company) > 1:
                     driver_text += f" ({company_name})"
@@ -1319,10 +1355,10 @@ class DispatcherHandler:
         await callback.answer()
 
     @staticmethod
-    async def handle_filter_by_company(callback: types.CallbackQuery, db: Session):
+    async def handle_filter_by_company(callback: types.CallbackQuery, db: AsyncSession):
         """Handle filtering drivers by company"""
         load_id = int(callback.data.split("_")[2])
-        
+
         load_service = LoadBotService(db)
         companies = await load_service.get_all_companies()
 
@@ -1336,7 +1372,7 @@ class DispatcherHandler:
             company_drivers = await load_service.get_drivers_by_company(company.id)
             driver_count = len(company_drivers)
             telegram_count = sum(1 for d in company_drivers if d.chat_id)
-            
+
             button_text = f"🏢 {company.name} ({driver_count} drivers"
             if telegram_count > 0:
                 button_text += f", {telegram_count} 📱"
@@ -1358,14 +1394,14 @@ class DispatcherHandler:
         ])
 
         await callback.message.edit_text(
-            f"🏢 **Select Company:**\n\nChoose a company to view its drivers:",
+            "🏢 **Select Company:**\n\nChoose a company to view its drivers:",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard_buttons),
             parse_mode="Markdown",
         )
         await callback.answer()
 
     @staticmethod
-    async def handle_company_drivers(callback: types.CallbackQuery, db: Session):
+    async def handle_company_drivers(callback: types.CallbackQuery, db: AsyncSession):
         """Handle showing drivers from specific company"""
         parts = callback.data.split("_")
         load_id = int(parts[2])
@@ -1414,7 +1450,7 @@ class DispatcherHandler:
         await callback.answer()
 
     @staticmethod
-    async def handle_load_details(callback: types.CallbackQuery, db: Session):
+    async def handle_load_details(callback: types.CallbackQuery, db: AsyncSession):
         """Show detailed load information"""
         load_id = int(callback.data.split("_")[2])
 
@@ -1441,8 +1477,16 @@ class DispatcherHandler:
 
         if load.assigned_driver:
             # Get driver details to show company
+            from sqlalchemy.orm import selectinload
+
             from app.db.models import Driver
-            driver = db.query(Driver).filter(Driver.id == load.driver_id).first()
+            driver = (
+                await db.execute(
+                    select(Driver)
+                    .options(selectinload(Driver.company))
+                    .where(Driver.id == load.driver_id)
+                )
+            ).scalar_one_or_none()
             driver_company = driver.company.name if driver and driver.company else "Unknown"
             text += f"**👤 Driver:** {load.assigned_driver} ({driver_company})\n"
         else:
@@ -1482,7 +1526,7 @@ class DispatcherHandler:
         await callback.answer()
 
     @staticmethod
-    async def handle_driver_selection(callback: types.CallbackQuery, db: Session):
+    async def handle_driver_selection(callback: types.CallbackQuery, db: AsyncSession):
         """Handle driver selection for load assignment - UPDATED FOR CROSS-COMPANY"""
         parts = callback.data.split("_")
         load_id = int(parts[2])
@@ -1490,42 +1534,42 @@ class DispatcherHandler:
 
         try:
             load_service = LoadBotService(db)
-            
+
             # Get driver and load info
             from app.db.repositories.driver_repository import DriverRepository
             driver_repo = DriverRepository(db)
-            driver = driver_repo.get_driver_by_id(driver_id)
-            load_data = load_service.get_load_details(load_id)
+            driver = await driver_repo.get_driver_by_id(driver_id)
+            load_data = await load_service.get_load_details(load_id)
 
             if not driver or not load_data:
                 await callback.answer("Driver or load not found!", show_alert=True)
                 return
 
             load = load_data["load"]
-            
+
             # Check if this is a cross-company assignment
             is_cross_company = driver.company_id != load.company_id if load.company_id else False
-            
+
             # Update load with driver assignment using the load service
             success = await load_service.assign_driver_to_load(load_id, driver_id)
-            
+
             if success:
                 assignment_type = "Cross-company" if is_cross_company else "Same company"
                 driver_company = driver.company.name if driver.company else "No Company"
                 load_company = load.company.name if load.company else "No Company"
-                
-                success_message = f"✅ **Driver Assigned Successfully!**\n\n"
+
+                success_message = "✅ **Driver Assigned Successfully!**\n\n"
                 success_message += f"**Driver:** {driver.name}\n"
                 success_message += f"**Driver Company:** {driver_company}\n"
                 success_message += f"**Load:** {load.trip_id}\n"
                 success_message += f"**Load Company:** {load_company}\n"
                 success_message += f"**Assignment Type:** {assignment_type}\n"
-                
+
                 if is_cross_company:
-                    success_message += f"\n🔄 This is a cross-company assignment!"
+                    success_message += "\n🔄 This is a cross-company assignment!"
 
                 keyboard_buttons = []
-                
+
                 # Add notification button if driver has Telegram
                 if driver.chat_id:
                     keyboard_buttons.append([
@@ -1535,7 +1579,7 @@ class DispatcherHandler:
                         )
                     ])
                 else:
-                    success_message += f"\n⚠️ Driver doesn't have Telegram notifications set up"
+                    success_message += "\n⚠️ Driver doesn't have Telegram notifications set up"
 
                 keyboard_buttons.extend([
                     [
@@ -1566,7 +1610,7 @@ class DispatcherHandler:
         await callback.answer()
 
     @staticmethod
-    async def handle_notify_driver(callback: types.CallbackQuery, db: Session):
+    async def handle_notify_driver(callback: types.CallbackQuery, db: AsyncSession):
         """Handle sending notification to driver"""
         load_id = int(callback.data.split("_")[2])
 
@@ -1634,7 +1678,7 @@ class DispatcherHandler:
         """Handle broadcast to all drivers across all companies"""
         await state.update_data(broadcast_type="all_drivers")
         await state.set_state(NotificationStates.waiting_for_message)
-        
+
         await callback.message.edit_text(
             "📢 **Broadcast to All Drivers**\n\n"
             "Enter the message you want to send to **all drivers across all companies**:\n\n"
@@ -1643,7 +1687,7 @@ class DispatcherHandler:
         await callback.answer()
 
     @staticmethod
-    async def handle_broadcast_by_company(callback: types.CallbackQuery, state: FSMContext, db: Session):
+    async def handle_broadcast_by_company(callback: types.CallbackQuery, state: FSMContext, db: AsyncSession):
         """Handle broadcast by company selection"""
         load_service = LoadBotService(db)
         companies = await load_service.get_all_companies()
@@ -1656,7 +1700,7 @@ class DispatcherHandler:
         for company in companies:
             company_drivers = await load_service.get_drivers_by_company(company.id)
             telegram_drivers = sum(1 for d in company_drivers if d.chat_id)
-            
+
             button_text = f"🏢 {company.name} ({telegram_drivers} drivers)"
             keyboard_buttons.append([
                 InlineKeyboardButton(
@@ -1683,7 +1727,7 @@ class DispatcherHandler:
         """Handle broadcast to only Telegram-enabled drivers"""
         await state.update_data(broadcast_type="telegram_only")
         await state.set_state(NotificationStates.waiting_for_message)
-        
+
         await callback.message.edit_text(
             "📱 **Broadcast to Telegram-Enabled Drivers**\n\n"
             "Enter the message you want to send to **all drivers with Telegram notifications** (across all companies):"
@@ -1692,7 +1736,7 @@ class DispatcherHandler:
 
     @staticmethod
     async def handle_broadcast_message_input(
-        message: types.Message, state: FSMContext, db: Session, user_data: dict
+        message: types.Message, state: FSMContext, db: AsyncSession, user_data: dict
     ):
         """Handle broadcast message input - UPDATED FOR CROSS-COMPANY"""
         if user_data["role"] != "dispatcher":
@@ -1705,28 +1749,43 @@ class DispatcherHandler:
         company_id = state_data.get("company_id")
 
         try:
-            from app.db.models import Driver, TelegramChat
             from aiogram import Bot
+
             from app.config import get_settings
+            from app.db.models import Driver, TelegramChat
 
             settings = get_settings()
             bot = Bot(token=settings.telegram_bot_token)
 
+            from sqlalchemy.orm import selectinload
+
             # Get drivers based on broadcast type
             if broadcast_type == "company" and company_id:
-                drivers_query = db.query(Driver).filter(
-                    Driver.company_id == company_id,
-                    Driver.chat_id.isnot(None)
+                drivers_stmt = (
+                    select(Driver)
+                    .options(selectinload(Driver.company))
+                    .where(
+                        Driver.company_id == company_id,
+                        Driver.chat_id.isnot(None),
+                    )
                 )
-                scope_text = f"company drivers"
+                scope_text = "company drivers"
             elif broadcast_type == "telegram_only":
-                drivers_query = db.query(Driver).filter(Driver.chat_id.isnot(None))
+                drivers_stmt = (
+                    select(Driver)
+                    .options(selectinload(Driver.company))
+                    .where(Driver.chat_id.isnot(None))
+                )
                 scope_text = "Telegram-enabled drivers (all companies)"
             else:  # all_drivers
-                drivers_query = db.query(Driver).filter(Driver.chat_id.isnot(None))
+                drivers_stmt = (
+                    select(Driver)
+                    .options(selectinload(Driver.company))
+                    .where(Driver.chat_id.isnot(None))
+                )
                 scope_text = "all drivers (all companies)"
 
-            drivers_with_chats = drivers_query.all()
+            drivers_with_chats = list((await db.execute(drivers_stmt)).scalars().all())
 
             sent_count = 0
             failed_count = 0
@@ -1735,10 +1794,10 @@ class DispatcherHandler:
             for driver in drivers_with_chats:
                 try:
                     chat = (
-                        db.query(TelegramChat)
-                        .filter(TelegramChat.id == driver.chat_id)
-                        .first()
-                    )
+                        await db.execute(
+                            select(TelegramChat).where(TelegramChat.id == driver.chat_id)
+                        )
+                    ).scalar_one_or_none()
                     if chat and chat.chat_token:
                         # Include company info in message for cross-company context
                         company_name = driver.company.name if driver.company else "No Company"
@@ -1760,11 +1819,11 @@ class DispatcherHandler:
                     failed_count += 1
 
             # Create detailed results message
-            result_message = f"📢 **Broadcast Completed!**\n\n"
+            result_message = "📢 **Broadcast Completed!**\n\n"
             result_message += f"**Scope:** {scope_text}\n"
             result_message += f"**✅ Sent:** {sent_count}\n"
             result_message += f"**❌ Failed:** {failed_count}\n\n"
-            
+
             if company_breakdown:
                 result_message += "**📊 Company Breakdown:**\n"
                 for company, count in sorted(company_breakdown.items()):
@@ -1779,23 +1838,23 @@ class DispatcherHandler:
         await state.clear()
 
     @staticmethod
-    async def handle_driver_statistics(callback: types.CallbackQuery, db: Session):
+    async def handle_driver_statistics(callback: types.CallbackQuery, db: AsyncSession):
         """Show driver statistics across all companies"""
         try:
             load_service = LoadBotService(db)
             company_stats = await load_service.get_company_statistics()
-            
+
             if not company_stats:
                 await callback.answer("No statistics available!", show_alert=True)
                 return
 
             text = "📊 **Driver Statistics (All Companies)**\n\n"
-            
+
             total_drivers = 0
             total_telegram = 0
             total_loads = 0
             total_unassigned = 0
-            
+
             for stat in company_stats:
                 company = stat["company"]
                 text += f"**🏢 {company.name}**\n"
@@ -1803,13 +1862,13 @@ class DispatcherHandler:
                 text += f"• With Telegram: {stat['drivers_with_telegram']}\n"
                 text += f"• Loads: {stat['total_loads']}\n"
                 text += f"• Unassigned Loads: {stat['unassigned_loads']}\n\n"
-                
+
                 total_drivers += stat['total_drivers']
                 total_telegram += stat['drivers_with_telegram']
                 total_loads += stat['total_loads']
                 total_unassigned += stat['unassigned_loads']
-            
-            text += f"**📈 System Totals:**\n"
+
+            text += "**📈 System Totals:**\n"
             text += f"• Total Drivers: {total_drivers}\n"
             text += f"• Telegram-Enabled: {total_telegram}\n"
             text += f"• Total Loads: {total_loads}\n"
@@ -1835,21 +1894,20 @@ class DispatcherHandler:
     async def handle_company_broadcast_selection(callback: types.CallbackQuery, state: FSMContext):
         """Handle company selection for broadcast"""
         company_id = int(callback.data.split("_")[2])
-        
+
         await state.update_data(broadcast_type="company", company_id=company_id)
         await state.set_state(NotificationStates.waiting_for_message)
-        
+
         # Get company name for confirmation
+        from app.db.database import AsyncSessionLocal
         from app.db.models import Company
-        from app.db.database import SessionLocal
-        
-        db = SessionLocal()
-        try:
-            company = db.query(Company).filter(Company.id == company_id).first()
+
+        async with AsyncSessionLocal() as db:
+            company = (
+                await db.execute(select(Company).where(Company.id == company_id))
+            ).scalar_one_or_none()
             company_name = company.name if company else "Unknown Company"
-        finally:
-            db.close()
-        
+
         await callback.message.edit_text(
             f"🏢 **Broadcast to {company_name}**\n\n"
             f"Enter the message you want to send to all drivers in **{company_name}**:"
@@ -1857,7 +1915,7 @@ class DispatcherHandler:
         await callback.answer()
 
     @staticmethod
-    async def handle_show_more_drivers(callback: types.CallbackQuery, db: Session):
+    async def handle_show_more_drivers(callback: types.CallbackQuery, db: AsyncSession):
         """Handle showing more drivers with pagination"""
         parts = callback.data.split("_")
         load_id = int(parts[3])
@@ -1868,13 +1926,13 @@ class DispatcherHandler:
 
         # Show next batch of drivers
         drivers_to_show = all_drivers[offset:offset + 15]
-        
+
         if not drivers_to_show:
             await callback.answer("No more drivers to show!", show_alert=True)
             return
 
         keyboard_buttons = []
-        
+
         # Group by company for this batch
         drivers_by_company = defaultdict(list)
         for driver in drivers_to_show:

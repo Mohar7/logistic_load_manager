@@ -1,8 +1,9 @@
 # app/schemas/load.py
-from pydantic import BaseModel, condecimal
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Any
+
 from fastapi import Body
+from pydantic import BaseModel, condecimal
 
 
 class LegBase(BaseModel):
@@ -17,8 +18,8 @@ class LegBase(BaseModel):
     drop_off_time_str: str
     fuel_sur_charge: condecimal(max_digits=12, decimal_places=2)
     distance: float
-    assigned_driver: Optional[str] = None
-    dispatcher_id: Optional[int] = None
+    assigned_driver: str | None = None
+    dispatcher_id: int | None = None
 
 
 class LegCreate(LegBase):
@@ -26,18 +27,18 @@ class LegCreate(LegBase):
 
 
 class LegUpdate(BaseModel):
-    leg_id: Optional[str] = None
-    pick_up_facility_id: Optional[str] = None
-    drop_off_facility_id: Optional[str] = None
-    pick_up_address: Optional[str] = None
-    drop_off_address: Optional[str] = None
-    pick_up_time: Optional[datetime] = None
-    drop_off_time: Optional[datetime] = None
-    pick_up_time_str: Optional[str] = None
-    drop_off_time_str: Optional[str] = None
-    fuel_sur_charge: Optional[condecimal(max_digits=12, decimal_places=2)] = None
-    distance: Optional[float] = None
-    assigned_driver: Optional[str] = None
+    leg_id: str | None = None
+    pick_up_facility_id: str | None = None
+    drop_off_facility_id: str | None = None
+    pick_up_address: str | None = None
+    drop_off_address: str | None = None
+    pick_up_time: datetime | None = None
+    drop_off_time: datetime | None = None
+    pick_up_time_str: str | None = None
+    drop_off_time_str: str | None = None
+    fuel_sur_charge: condecimal(max_digits=12, decimal_places=2) | None = None
+    distance: float | None = None
+    assigned_driver: str | None = None
 
 
 class LegInDB(LegBase):
@@ -61,9 +62,9 @@ class TripBase(BaseModel):
     rate: condecimal(max_digits=12, decimal_places=2)
     rate_per_mile: condecimal(max_digits=12, decimal_places=2)
     distance: float
-    assigned_driver: Optional[str] = None
+    assigned_driver: str | None = None
     is_team_load: bool = False
-    dispatcher_id: Optional[int] = None
+    dispatcher_id: int | None = None
 
 
 class TripCreate(TripBase):
@@ -71,21 +72,21 @@ class TripCreate(TripBase):
 
 
 class TripUpdate(BaseModel):
-    trip_id: Optional[str] = None
-    pick_up_facility_id: Optional[str] = None
-    drop_off_facility_id: Optional[str] = None
-    pick_up_address: Optional[str] = None
-    drop_off_address: Optional[str] = None
-    pick_up_time: Optional[datetime] = None
-    drop_off_time: Optional[datetime] = None
-    pick_up_time_str: Optional[str] = None
-    drop_off_time_str: Optional[str] = None
-    rate: Optional[condecimal(max_digits=12, decimal_places=2)] = None
-    rate_per_mile: Optional[condecimal(max_digits=12, decimal_places=2)] = None
-    distance: Optional[float] = None
-    assigned_driver: Optional[str] = None
-    is_team_load: Optional[bool] = None
-    dispatcher_id: Optional[int] = None
+    trip_id: str | None = None
+    pick_up_facility_id: str | None = None
+    drop_off_facility_id: str | None = None
+    pick_up_address: str | None = None
+    drop_off_address: str | None = None
+    pick_up_time: datetime | None = None
+    drop_off_time: datetime | None = None
+    pick_up_time_str: str | None = None
+    drop_off_time_str: str | None = None
+    rate: condecimal(max_digits=12, decimal_places=2) | None = None
+    rate_per_mile: condecimal(max_digits=12, decimal_places=2) | None = None
+    distance: float | None = None
+    assigned_driver: str | None = None
+    is_team_load: bool | None = None
+    dispatcher_id: int | None = None
 
 
 class TripInDB(TripBase):
@@ -96,7 +97,7 @@ class TripInDB(TripBase):
 
 
 class Trip(TripInDB):
-    legs: List[LegInDB] = []
+    legs: list[LegInDB] = []
 
 
 class Leg(LegInDB):
@@ -116,19 +117,19 @@ class LoadUpdateRequest(BaseModel):
     Request model for updating a load.
     """
 
-    trip_id: Optional[str] = None
-    pickup_facility_id: Optional[int] = None
-    dropoff_facility_id: Optional[int] = None
-    pickup_address: Optional[str] = None
-    dropoff_address: Optional[str] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-    rate: Optional[condecimal(max_digits=12, decimal_places=2)] = None
-    rate_per_mile: Optional[condecimal(max_digits=12, decimal_places=2)] = None
-    distance: Optional[float] = None
-    assigned_driver: Optional[str] = None
-    is_team_load: Optional[bool] = None
-    dispatcher_id: Optional[int] = None
+    trip_id: str | None = None
+    pickup_facility_id: int | None = None
+    dropoff_facility_id: int | None = None
+    pickup_address: str | None = None
+    dropoff_address: str | None = None
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    rate: condecimal(max_digits=12, decimal_places=2) | None = None
+    rate_per_mile: condecimal(max_digits=12, decimal_places=2) | None = None
+    distance: float | None = None
+    assigned_driver: str | None = None
+    is_team_load: bool | None = None
+    dispatcher_id: int | None = None
 
     class Config:
         from_attributes = True
@@ -139,8 +140,8 @@ class ParsedLoadResponse(BaseModel):
     Response model for a parsed load.
     """
 
-    tripInfo: Dict[str, Any]
-    legs: List[Dict[str, Any]]
+    tripInfo: dict[str, Any]
+    legs: list[dict[str, Any]]
 
 
 class LoadResponse(BaseModel):
@@ -150,17 +151,17 @@ class LoadResponse(BaseModel):
 
     id: int
     trip_id: str
-    pickup_facility: Optional[str] = None
-    dropoff_facility: Optional[str] = None
-    pickup_address: Optional[str] = None
-    dropoff_address: Optional[str] = None
+    pickup_facility: str | None = None
+    dropoff_facility: str | None = None
+    pickup_address: str | None = None
+    dropoff_address: str | None = None
     start_time: datetime
     end_time: datetime
     rate: float
     rate_per_mile: float
-    distance: Optional[float] = None
-    assigned_driver: Optional[str] = None
-    legs: List[Dict[str, Any]] = []
+    distance: float | None = None
+    assigned_driver: str | None = None
+    legs: list[dict[str, Any]] = []
 
     class Config:
         from_attributes = True  # Changed from orm_mode to from_attributes

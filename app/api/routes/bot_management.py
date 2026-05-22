@@ -1,13 +1,12 @@
 # app/api/routes/bot_management.py
 import logging
-from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.services.chat_service import ChatService
-from app.bot.services.user_service import UserService
 from app.db.database import get_db
 from app.db.models import Dispatchers, TelegramChat
 from app.services.notification_service import NotificationService
@@ -25,14 +24,14 @@ router = APIRouter(
 class TelegramChatCreate(BaseModel):
     group_name: str
     chat_token: int
-    company_id: Optional[int] = None
+    company_id: int | None = None
 
 
 class TelegramChatResponse(BaseModel):
     id: int
     group_name: str
     chat_token: int
-    company_id: Optional[int] = None
+    company_id: int | None = None
 
     class Config:
         from_attributes = True
@@ -43,7 +42,7 @@ class BotUserResponse(BaseModel):
     name: str
     telegram_id: int
     role: str
-    status: Optional[str] = "active"
+    status: str | None = "active"
 
     class Config:
         from_attributes = True
@@ -52,13 +51,13 @@ class BotUserResponse(BaseModel):
 class NotificationRequest(BaseModel):
     message: str
     target_type: str  # "all", "drivers", "dispatchers", "specific_chat"
-    target_id: Optional[int] = None  # chat_id or user_id if specific
+    target_id: int | None = None  # chat_id or user_id if specific
 
 
 # Chat management endpoints
 @router.post("/chats", response_model=TelegramChatResponse)
 async def create_telegram_chat(
-    chat_data: TelegramChatCreate, db: Session = Depends(get_db)
+    chat_data: TelegramChatCreate, db: AsyncSession = Depends(get_db)
 ):
     """Create a new Telegram chat entry"""
     chat_service = ChatService(db)
@@ -88,8 +87,8 @@ async def create_telegram_chat(
     )
 
 
-@router.get("/chats", response_model=List[TelegramChatResponse])
-async def get_telegram_chats(db: Session = Depends(get_db)):
+@router.get("/chats", response_model=list[TelegramChatResponse])
+async def get_telegram_chats(db: AsyncSession = Depends(get_db)):
     """Get all Telegram chats"""
     chat_service = ChatService(db)
     chats = await chat_service.get_all_chats()
@@ -106,7 +105,7 @@ async def get_telegram_chats(db: Session = Depends(get_db)):
 
 
 @router.delete("/chats/{chat_id}")
-async def delete_telegram_chat(chat_id: int, db: Session = Depends(get_db)):
+async def delete_telegram_chat(chat_id: int, db: AsyncSession = Depends(get_db)):
     """Delete a Telegram chat"""
     chat_service = ChatService(db)
     success = await chat_service.remove_telegram_chat(chat_id)
@@ -118,11 +117,12 @@ async def delete_telegram_chat(chat_id: int, db: Session = Depends(get_db)):
 
 
 # User management endpoints
-@router.get("/users", response_model=List[BotUserResponse])
-async def get_bot_users(db: Session = Depends(get_db)):
+@router.get("/users", response_model=list[BotUserResponse])
+async def get_bot_users(db: AsyncSession = Depends(get_db)):
     """Get all bot users (dispatchers and managers)"""
     try:
-        users = db.query(Dispatchers).all()
+        result = await db.execute(select(Dispatchers))
+        users = list(result.scalars().all())
 
         return [
             BotUserResponse(
@@ -135,14 +135,17 @@ async def get_bot_users(db: Session = Depends(get_db)):
             for user in users
         ]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving users: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving users: {e!s}")
 
 
 @router.get("/users/managers")
-async def get_pending_managers(db: Session = Depends(get_db)):
+async def get_pending_managers(db: AsyncSession = Depends(get_db)):
     """Get all managers (for approval workflow)"""
     try:
-        managers = db.query(Dispatchers).filter(Dispatchers.role == "manager").all()
+        result = await db.execute(
+            select(Dispatchers).where(Dispatchers.role == "manager")
+        )
+        managers = list(result.scalars().all())
 
         return [
             {
@@ -155,17 +158,18 @@ async def get_pending_managers(db: Session = Depends(get_db)):
         ]
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Error retrieving managers: {str(e)}"
+            status_code=500, detail=f"Error retrieving managers: {e!s}"
         )
 
 
 @router.get("/users/dispatchers")
-async def get_dispatchers(db: Session = Depends(get_db)):
+async def get_dispatchers(db: AsyncSession = Depends(get_db)):
     """Get all dispatchers"""
     try:
-        dispatchers = (
-            db.query(Dispatchers).filter(Dispatchers.role == "dispatcher").all()
+        result = await db.execute(
+            select(Dispatchers).where(Dispatchers.role == "dispatcher")
         )
+        dispatchers = list(result.scalars().all())
 
         return [
             {
@@ -178,15 +182,18 @@ async def get_dispatchers(db: Session = Depends(get_db)):
         ]
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Error retrieving dispatchers: {str(e)}"
+            status_code=500, detail=f"Error retrieving dispatchers: {e!s}"
         )
 
 
 @router.post("/users/{user_id}/approve")
-async def approve_user(user_id: int, db: Session = Depends(get_db)):
+async def approve_user(user_id: int, db: AsyncSession = Depends(get_db)):
     """Approve a pending user registration"""
     try:
-        user = db.query(Dispatchers).filter(Dispatchers.id == user_id).first()
+        result = await db.execute(
+            select(Dispatchers).where(Dispatchers.id == user_id)
+        )
+        user = result.scalar_one_or_none()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
@@ -195,24 +202,27 @@ async def approve_user(user_id: int, db: Session = Depends(get_db)):
 
         return {"message": f"User {user.name} approved successfully"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error approving user: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error approving user: {e!s}")
 
 
 @router.delete("/users/{user_id}")
-async def delete_bot_user(user_id: int, db: Session = Depends(get_db)):
+async def delete_bot_user(user_id: int, db: AsyncSession = Depends(get_db)):
     """Delete a bot user"""
     try:
-        user = db.query(Dispatchers).filter(Dispatchers.id == user_id).first()
+        result = await db.execute(
+            select(Dispatchers).where(Dispatchers.id == user_id)
+        )
+        user = result.scalar_one_or_none()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        db.delete(user)
-        db.commit()
+        await db.delete(user)
+        await db.commit()
 
         return {"message": f"User {user.name} deleted successfully"}
     except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error deleting user: {str(e)}")
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error deleting user: {e!s}")
 
 
 # Notification endpoints
@@ -220,13 +230,14 @@ async def delete_bot_user(user_id: int, db: Session = Depends(get_db)):
 async def send_notification(
     notification: NotificationRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """Send notifications via Telegram bot"""
 
     async def send_notification_task():
         try:
             from aiogram import Bot
+
             from app.config import get_settings
             from app.db.models import Driver, TelegramChat
 
@@ -238,7 +249,8 @@ async def send_notification(
 
             if notification.target_type == "all":
                 # Send to all connected chats
-                chats = db.query(TelegramChat).all()
+                chats_result = await db.execute(select(TelegramChat))
+                chats = list(chats_result.scalars().all())
                 for chat in chats:
                     try:
                         await bot.send_message(
@@ -254,14 +266,18 @@ async def send_notification(
 
             elif notification.target_type == "drivers":
                 # Send to all drivers
-                drivers = db.query(Driver).filter(Driver.chat_id.isnot(None)).all()
+                drivers_result = await db.execute(
+                    select(Driver).where(Driver.chat_id.isnot(None))
+                )
+                drivers = list(drivers_result.scalars().all())
                 for driver in drivers:
                     try:
-                        chat = (
-                            db.query(TelegramChat)
-                            .filter(TelegramChat.id == driver.chat_id)
-                            .first()
+                        chat_result = await db.execute(
+                            select(TelegramChat).where(
+                                TelegramChat.id == driver.chat_id
+                            )
                         )
+                        chat = chat_result.scalar_one_or_none()
                         if chat:
                             await bot.send_message(
                                 chat_id=chat.chat_token,
@@ -304,7 +320,9 @@ async def send_notification(
 
 @router.post("/notifications/load/{load_id}")
 async def notify_load_assignment(
-    load_id: int, driver_id: Optional[int] = None, db: Session = Depends(get_db)
+    load_id: int,
+    driver_id: int | None = None,
+    db: AsyncSession = Depends(get_db),
 ):
     """Send load assignment notification"""
 
@@ -322,22 +340,48 @@ async def notify_load_assignment(
 
 # Bot statistics endpoint
 @router.get("/stats")
-async def get_bot_stats(db: Session = Depends(get_db)):
+async def get_bot_stats(db: AsyncSession = Depends(get_db)):
     """Get bot usage statistics"""
     try:
-        from app.db.models import Load, Driver, TelegramChat
+        from sqlalchemy import func
 
-        total_chats = db.query(TelegramChat).count()
-        total_dispatchers = db.query(Dispatchers).count()
-        total_drivers = db.query(Driver).count()
-        total_loads = db.query(Load).count()
+        from app.db.models import Driver, Load
+
+        total_chats = (
+            await db.execute(select(func.count()).select_from(TelegramChat))
+        ).scalar_one()
+        total_dispatchers = (
+            await db.execute(select(func.count()).select_from(Dispatchers))
+        ).scalar_one()
+        total_drivers = (
+            await db.execute(select(func.count()).select_from(Driver))
+        ).scalar_one()
+        total_loads = (
+            await db.execute(select(func.count()).select_from(Load))
+        ).scalar_one()
 
         # Active assignments
-        assigned_loads = db.query(Load).filter(Load.driver_id.isnot(None)).count()
-        unassigned_loads = db.query(Load).filter(Load.driver_id.is_(None)).count()
+        assigned_loads = (
+            await db.execute(
+                select(func.count())
+                .select_from(Load)
+                .where(Load.driver_id.isnot(None))
+            )
+        ).scalar_one()
+        unassigned_loads = (
+            await db.execute(
+                select(func.count()).select_from(Load).where(Load.driver_id.is_(None))
+            )
+        ).scalar_one()
 
         # Drivers with telegram connections
-        connected_drivers = db.query(Driver).filter(Driver.chat_id.isnot(None)).count()
+        connected_drivers = (
+            await db.execute(
+                select(func.count())
+                .select_from(Driver)
+                .where(Driver.chat_id.isnot(None))
+            )
+        ).scalar_one()
 
         return {
             "telegram_chats": total_chats,
@@ -353,12 +397,12 @@ async def get_bot_stats(db: Session = Depends(get_db)):
             },
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving stats: {e!s}")
 
 
 # Webhook endpoint for Telegram (if you want to use webhooks instead of polling)
 @router.post("/webhook")
-async def telegram_webhook(request: dict, db: Session = Depends(get_db)):
+async def telegram_webhook(request: dict, db: AsyncSession = Depends(get_db)):
     """Handle Telegram webhook updates"""
     # This would be used if you switch from polling to webhooks
     # Implementation depends on your deployment setup
@@ -370,8 +414,9 @@ async def telegram_webhook(request: dict, db: Session = Depends(get_db)):
 async def bot_health_check():
     """Check if bot is running and configured properly"""
     try:
-        from app.config import get_settings
         from aiogram import Bot
+
+        from app.config import get_settings
 
         settings = get_settings()
 
@@ -397,7 +442,7 @@ async def bot_health_check():
             }
         except Exception as e:
             await bot.session.close()
-            return {"status": "error", "message": f"Bot connection failed: {str(e)}"}
+            return {"status": "error", "message": f"Bot connection failed: {e!s}"}
 
     except Exception as e:
-        return {"status": "error", "message": f"Configuration error: {str(e)}"}
+        return {"status": "error", "message": f"Configuration error: {e!s}"}

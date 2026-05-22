@@ -1,11 +1,13 @@
 # app/api/routes/load_parser.py
-from fastapi import APIRouter, Depends, HTTPException, Body, Query
-from sqlalchemy.orm import Session
-from typing import Dict, Any, List, Annotated
-from app.db.database import get_db
+from typing import Annotated
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.parser.parsing_service import ParsingService, get_parsing_service
+from app.db.database import get_db
+from app.schemas.load import LoadResponse, LoadUpdateRequest, ParsedLoadResponse
 from app.services.load_service import LoadService
-from app.schemas.load import ParsedLoadResponse, LoadResponse, LoadUpdateRequest
 
 router = APIRouter(
     prefix="/loads",
@@ -38,14 +40,14 @@ async def parse_load(
 @router.post("/create", response_model=LoadResponse)
 async def create_load(
     dispatcher_id: Annotated[int | None, Query()] = None,
-    text: Annotated[str, Body(media_type="text/plain")] = None,
-    db: Session = Depends(get_db),
+    text: Annotated[str | None, Body(media_type="text/plain")] = None,
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Create a new load from parsed text.
     """
     load_service = LoadService(db)
-    result = load_service.parse_and_save_load(text, dispatcher_id=dispatcher_id)
+    result = await load_service.parse_and_save_load(text, dispatcher_id=dispatcher_id)
 
     # Transform the result to match the expected response model
     load = result["load"]
@@ -91,12 +93,12 @@ async def create_load(
 
 
 @router.get("/{load_id}", response_model=LoadResponse)
-async def get_load(load_id: int, db: Session = Depends(get_db)):
+async def get_load(load_id: int, db: AsyncSession = Depends(get_db)):
     """
     Get a load by its ID.
     """
     load_service = LoadService(db)
-    result = load_service.get_load_by_id(load_id)
+    result = await load_service.get_load_by_id(load_id)
 
     if not result:
         raise HTTPException(status_code=404, detail=f"Load with ID {load_id} not found")
@@ -146,7 +148,7 @@ async def get_load(load_id: int, db: Session = Depends(get_db)):
 
 @router.put("/{load_id}", response_model=LoadResponse)
 async def update_load(
-    load_id: int, load_update: LoadUpdateRequest, db: Session = Depends(get_db)
+    load_id: int, load_update: LoadUpdateRequest, db: AsyncSession = Depends(get_db)
 ):
     """
     Update an existing load.
@@ -154,7 +156,9 @@ async def update_load(
     load_service = LoadService(db)
 
     try:
-        result = load_service.update_load(load_id, load_update.dict(exclude_unset=True))
+        result = await load_service.update_load(
+            load_id, load_update.dict(exclude_unset=True)
+        )
 
         if not result:
             raise HTTPException(
@@ -204,15 +208,15 @@ async def update_load(
         return response
 
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to update load: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to update load: {e!s}")
 
 
 @router.put("/{load_id}/parse", response_model=LoadResponse)
 async def update_load_with_parsed_data(
     load_id: int,
     dispatcher_id: Annotated[int | None, Query()] = None,
-    text: Annotated[str, Body(media_type="text/plain")] = None,
-    db: Session = Depends(get_db),
+    text: Annotated[str | None, Body(media_type="text/plain")] = None,
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Update a load by parsing new text data.
@@ -220,7 +224,9 @@ async def update_load_with_parsed_data(
     load_service = LoadService(db)
 
     try:
-        result = load_service.update_load_with_parsed_data(load_id, text, dispatcher_id)
+        result = await load_service.update_load_with_parsed_data(
+            load_id, text, dispatcher_id
+        )
 
         if not result:
             raise HTTPException(
@@ -270,18 +276,18 @@ async def update_load_with_parsed_data(
         return response
 
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to update load: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to update load: {e!s}")
 
 
 @router.delete("/{load_id}")
-async def delete_load(load_id: int, db: Session = Depends(get_db)):
+async def delete_load(load_id: int, db: AsyncSession = Depends(get_db)):
     """
     Delete a load and all its associated legs.
     """
     load_service = LoadService(db)
 
     try:
-        success = load_service.delete_load(load_id)
+        success = await load_service.delete_load(load_id)
 
         if not success:
             raise HTTPException(
@@ -291,16 +297,18 @@ async def delete_load(load_id: int, db: Session = Depends(get_db)):
         return {"message": f"Load {load_id} deleted successfully"}
 
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to delete load: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to delete load: {e!s}")
 
 
-@router.get("/", response_model=List[LoadResponse])
-async def get_loads(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+@router.get("/", response_model=list[LoadResponse])
+async def get_loads(
+    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)
+):
     """
     Get all loads with pagination.
     """
     load_service = LoadService(db)
-    results = load_service.get_all_loads(skip, limit)
+    results = await load_service.get_all_loads(skip, limit)
 
     response = []
     for result in results:
@@ -350,14 +358,14 @@ async def get_loads(skip: int = 0, limit: int = 100, db: Session = Depends(get_d
 
 @router.get("/set_dispatcher/{load_id}/{dispatcher_id}")
 async def update_dispatcher_for_load(
-    load_id: int, dispatcher_id: int, db: Session = Depends(get_db)
+    load_id: int, dispatcher_id: int, db: AsyncSession = Depends(get_db)
 ):
     """
     Set dispatcher for a load.
     """
     load_service = LoadService(db)
     try:
-        load_service.update_dispatcher_for_load(
+        await load_service.update_dispatcher_for_load(
             load_id=load_id, dispatcher_id=dispatcher_id
         )
         return {"message": "success"}

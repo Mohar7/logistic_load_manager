@@ -1,32 +1,30 @@
 # app/core/parser/parsing_service.py
-import json
 import logging
-import re
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from fastapi import Body, Depends
+from fastapi import Body
 
 from app.schemas.load import Leg, Trip
 
 logger = logging.getLogger(__name__)
-from app.core.utils.date_utils import parse_datetime_with_tz
-from app.core.utils.text_utils import find_first, find_all, parse_decimal
 from app.core.parser.regex_patterns import (
-    TRIP_ID_PATTERN,
+    ADDRESS_PATTERN,
+    DISTANCE_PATTERN,
+    DRIVER_PATTERN,
     FACILITY_PATTERN,
-    TRIP_TIME_PATTERN,
+    LEG_FACILITY_PATTERN,
+    LEG_ID_PATTERN,
+    LEG_SPLIT_MARKER,
     PRICE_PATTERN,
     RPM_PATTERN,
-    DISTANCE_PATTERN,
-    LEG_ID_PATTERN,
-    LEG_FACILITY_PATTERN,
     SIMPLE_PRICE_PATTERN,
-    ADDRESS_PATTERN,
-    DRIVER_PATTERN,
-    LEG_SPLIT_MARKER,
+    TRIP_ID_PATTERN,
+    TRIP_TIME_PATTERN,
 )
+from app.core.utils.date_utils import parse_datetime_with_tz
+from app.core.utils.text_utils import find_all, find_first, parse_decimal
 
 
 class ParsingService:
@@ -40,7 +38,7 @@ class ParsingService:
     def __init__(
         self,
         text: str = Body(description="load text", media_type="text/plain", default=""),
-        dispatcher_id: Optional[int] = None,
+        dispatcher_id: int | None = None,
     ):
         self.text = text
         self.data = None
@@ -49,8 +47,8 @@ class ParsingService:
     def _extract_trip_info(
         self,
         text: str,
-        full_text: Optional[str] = None,
-        dispatcher_id: Optional[int] = None,
+        full_text: str | None = None,
+        dispatcher_id: int | None = None,
     ) -> Trip:
         """Extracts trip information from a text block."""
         if full_text is None:
@@ -153,8 +151,8 @@ class ParsingService:
         )
 
     def parse(
-        self, input_text: str = None, dispatcher_id: Optional[int] = None
-    ) -> Dict[str, Any]:
+        self, input_text: str = None, dispatcher_id: int | None = None
+    ) -> dict[str, Any]:
         """
         Main method for parsing text.
 

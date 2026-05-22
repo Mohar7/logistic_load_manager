@@ -1,9 +1,10 @@
 # app/bot/handlers/admin.py
-from aiogram import types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from sqlalchemy.orm import Session
-from app.bot.services.chat_service import ChatService
 import logging
+
+from aiogram import types
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -12,14 +13,34 @@ class AdminHandler:
     """Handler for admin/manager functions"""
 
     @staticmethod
-    async def handle_system_stats(callback: types.CallbackQuery, db: Session):
+    async def handle_system_stats(callback: types.CallbackQuery, db: AsyncSession):
         """Show system statistics"""
-        from app.db.models import Load, Driver, TelegramChat
+        from app.db.models import Driver, Load, TelegramChat
 
         try:
-            total_loads = db.query(Load).count()
-            total_drivers = db.query(Driver).count()
-            total_chats = db.query(TelegramChat).count()
+            total_loads = (
+                await db.execute(select(func.count()).select_from(Load))
+            ).scalar_one()
+            total_drivers = (
+                await db.execute(select(func.count()).select_from(Driver))
+            ).scalar_one()
+            total_chats = (
+                await db.execute(select(func.count()).select_from(TelegramChat))
+            ).scalar_one()
+            active_loads = (
+                await db.execute(
+                    select(func.count())
+                    .select_from(Load)
+                    .where(Load.assigned_driver.isnot(None))
+                )
+            ).scalar_one()
+            unassigned_loads = (
+                await db.execute(
+                    select(func.count())
+                    .select_from(Load)
+                    .where(Load.assigned_driver.is_(None))
+                )
+            ).scalar_one()
 
             stats_text = f"""
 📊 System Statistics
@@ -29,8 +50,8 @@ class AdminHandler:
 💬 Telegram Groups: {total_chats}
 
 Recent Activity:
-• Active loads: {db.query(Load).filter(Load.assigned_driver.isnot(None)).count()}
-• Unassigned loads: {db.query(Load).filter(Load.assigned_driver.is_(None)).count()}
+• Active loads: {active_loads}
+• Unassigned loads: {unassigned_loads}
             """
 
             await callback.message.edit_text(

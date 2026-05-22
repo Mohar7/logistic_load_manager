@@ -1,11 +1,12 @@
 # app/services/load_service.py
-from typing import Dict, Any, List, Optional
+import logging
+from typing import Any
 
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.parser.parsing_service import ParsingService
 from app.db.repositories.load_repository import LoadRepository
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -16,13 +17,13 @@ class LoadService:
     Connects the parsing service with the database.
     """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
         self.load_repository = LoadRepository(db)
 
-    def parse_and_save_load(
-        self, load_text: str, dispatcher_id: int = None
-    ) -> Dict[str, Any]:
+    async def parse_and_save_load(
+        self, load_text: str, dispatcher_id: int | None = None
+    ) -> dict[str, Any]:
         try:
             # Parse the load text
             parsing_service = ParsingService(
@@ -40,7 +41,7 @@ class LoadService:
                 )
 
             # Check if load with this trip_id already exists
-            existing_load = self.load_repository.get_load_by_trip_id(
+            existing_load = await self.load_repository.get_load_by_trip_id(
                 parsed_data["tripInfo"]["trip_id"]
             )
             if existing_load:
@@ -48,27 +49,27 @@ class LoadService:
                     f"Load with trip_id {parsed_data['tripInfo']['trip_id']} already exists"
                 )
                 # Return existing load with its legs
-                legs = self.load_repository.get_legs_for_load(existing_load.id)
+                legs = await self.load_repository.get_legs_for_load(existing_load.id)
                 return {"load": existing_load, "legs": legs, "is_new": False}
 
             # Create new load
-            load = self.load_repository.create_load(parsed_data["tripInfo"])
+            load = await self.load_repository.create_load(parsed_data["tripInfo"])
 
             # Create legs for the load
             legs = []
             for leg_data in parsed_data.get("legs", []):
-                leg = self.load_repository.create_leg(load.id, leg_data)
+                leg = await self.load_repository.create_leg(load.id, leg_data)
                 legs.append(leg)
 
             return {"load": load, "legs": legs, "is_new": True}
 
         except Exception as e:
-            logger.error(f"Error in parse_and_save_load: {str(e)}")
+            logger.error(f"Error in parse_and_save_load: {e!s}")
             raise
 
-    def update_load(
-        self, load_id: int, update_data: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    async def update_load(
+        self, load_id: int, update_data: dict[str, Any]
+    ) -> dict[str, Any] | None:
         """
         Update an existing load with provided data.
 
@@ -81,27 +82,27 @@ class LoadService:
         """
         try:
             # Check if load exists
-            existing_load = self.load_repository.get_load_by_id(load_id)
+            existing_load = await self.load_repository.get_load_by_id(load_id)
             if not existing_load:
                 logger.warning(f"Load with ID {load_id} not found")
                 return None
 
             # Update the load
-            updated_load = self.load_repository.update_load(load_id, update_data)
+            updated_load = await self.load_repository.update_load(load_id, update_data)
 
             # Get updated legs
-            legs = self.load_repository.get_legs_for_load(load_id)
+            legs = await self.load_repository.get_legs_for_load(load_id)
 
             logger.info(f"Load {load_id} updated successfully")
             return {"load": updated_load, "legs": legs}
 
         except Exception as e:
-            logger.error(f"Error updating load {load_id}: {str(e)}")
+            logger.error(f"Error updating load {load_id}: {e!s}")
             raise
 
-    def update_load_with_parsed_data(
-        self, load_id: int, load_text: str, dispatcher_id: int = None
-    ) -> Optional[Dict[str, Any]]:
+    async def update_load_with_parsed_data(
+        self, load_id: int, load_text: str, dispatcher_id: int | None = None
+    ) -> dict[str, Any] | None:
         """
         Update an existing load by parsing new text data.
 
@@ -115,7 +116,7 @@ class LoadService:
         """
         try:
             # Check if load exists
-            existing_load = self.load_repository.get_load_by_id(load_id)
+            existing_load = await self.load_repository.get_load_by_id(load_id)
             if not existing_load:
                 logger.warning(f"Load with ID {load_id} not found")
                 return None
@@ -132,27 +133,27 @@ class LoadService:
                 )
 
             # Delete existing legs
-            self.load_repository.delete_legs_for_load(load_id)
+            await self.load_repository.delete_legs_for_load(load_id)
 
             # Update the load with parsed trip info
-            updated_load = self.load_repository.update_load(
+            updated_load = await self.load_repository.update_load(
                 load_id, parsed_data["tripInfo"]
             )
 
             # Create new legs
             legs = []
             for leg_data in parsed_data.get("legs", []):
-                leg = self.load_repository.create_leg(load_id, leg_data)
+                leg = await self.load_repository.create_leg(load_id, leg_data)
                 legs.append(leg)
 
             logger.info(f"Load {load_id} updated with parsed data successfully")
             return {"load": updated_load, "legs": legs}
 
         except Exception as e:
-            logger.error(f"Error updating load {load_id} with parsed data: {str(e)}")
+            logger.error(f"Error updating load {load_id} with parsed data: {e!s}")
             raise
 
-    def delete_load(self, load_id: int) -> bool:
+    async def delete_load(self, load_id: int) -> bool:
         """
         Delete a load and all its associated legs.
 
@@ -164,16 +165,16 @@ class LoadService:
         """
         try:
             # Check if load exists
-            existing_load = self.load_repository.get_load_by_id(load_id)
+            existing_load = await self.load_repository.get_load_by_id(load_id)
             if not existing_load:
                 logger.warning(f"Load with ID {load_id} not found")
                 return False
 
             # Delete legs first (foreign key constraint)
-            self.load_repository.delete_legs_for_load(load_id)
+            await self.load_repository.delete_legs_for_load(load_id)
 
             # Delete the load
-            success = self.load_repository.delete_load(load_id)
+            success = await self.load_repository.delete_load(load_id)
 
             if success:
                 logger.info(f"Load {load_id} and its legs deleted successfully")
@@ -183,42 +184,46 @@ class LoadService:
             return success
 
         except Exception as e:
-            logger.error(f"Error deleting load {load_id}: {str(e)}")
+            logger.error(f"Error deleting load {load_id}: {e!s}")
             raise
 
-    def get_load_by_id(self, load_id: int) -> Optional[Dict[str, Any]]:
-        load = self.load_repository.get_load_by_id(load_id)
+    async def get_load_by_id(self, load_id: int) -> dict[str, Any] | None:
+        load = await self.load_repository.get_load_by_id(load_id)
         if not load:
             return None
 
-        legs = self.load_repository.get_legs_for_load(load_id)
+        legs = await self.load_repository.get_legs_for_load(load_id)
 
         return {"load": load, "legs": legs}
 
-    def get_load_by_trip_id(self, trip_id: str) -> Optional[Dict[str, Any]]:
-        load = self.load_repository.get_load_by_trip_id(trip_id)
+    async def get_load_by_trip_id(self, trip_id: str) -> dict[str, Any] | None:
+        load = await self.load_repository.get_load_by_trip_id(trip_id)
         if not load:
             return None
 
-        legs = self.load_repository.get_legs_for_load(load.id)
+        legs = await self.load_repository.get_legs_for_load(load.id)
 
         return {"load": load, "legs": legs}
 
-    def get_all_loads(self, skip: int = 0, limit: int = 100) -> List[Dict[str, Any]]:
-        loads = self.load_repository.get_loads(skip, limit)
+    async def get_all_loads(
+        self, skip: int = 0, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        loads = await self.load_repository.get_loads(skip, limit)
         result = []
 
         for load in loads:
-            legs = self.load_repository.get_legs_for_load(load.id)
+            legs = await self.load_repository.get_legs_for_load(load.id)
             result.append({"load": load, "legs": legs})
 
         return result
 
-    def update_dispatcher_for_load(self, load_id: int, dispatcher_id: int):
+    async def update_dispatcher_for_load(
+        self, load_id: int, dispatcher_id: int
+    ) -> None:
         try:
-            self.load_repository.update_dispatcher_for_the_load(
+            await self.load_repository.update_dispatcher_for_the_load(
                 load_id=load_id, dispatcher_id=dispatcher_id
             )
         except SQLAlchemyError as e:
-            logger.error(f"Error updating dispatcher for load: {str(e)}")
+            logger.error(f"Error updating dispatcher for load: {e!s}")
             raise

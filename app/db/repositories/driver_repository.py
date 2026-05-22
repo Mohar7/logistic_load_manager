@@ -1,9 +1,11 @@
 # app/db/repositories/driver_repository.py
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
-from typing import List, Optional
-from app.db.models import Driver, Company, TelegramChat
 import logging
+
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.models import Company, Driver, TelegramChat
 
 logger = logging.getLogger(__name__)
 
@@ -14,11 +16,11 @@ class DriverRepository:
     Handles database operations for drivers.
     """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
-    def create_driver(
-        self, name: str, company_id: int, chat_id: Optional[int] = None
+    async def create_driver(
+        self, name: str, company_id: int, chat_id: int | None = None
     ) -> Driver:
         """
         Create a new driver.
@@ -33,23 +35,28 @@ class DriverRepository:
         """
         try:
             # Ensure company exists
-            company = self.db.query(Company).filter(Company.id == company_id).first()
+            result = await self.db.execute(
+                select(Company).where(Company.id == company_id)
+            )
+            company = result.scalar_one_or_none()
             if not company:
                 raise ValueError(f"Company with ID {company_id} does not exist")
 
             # Ensure chat exists if provided
             if chat_id:
-                chat = (
-                    self.db.query(TelegramChat)
-                    .filter(TelegramChat.id == chat_id)
-                    .first()
+                result = await self.db.execute(
+                    select(TelegramChat).where(TelegramChat.id == chat_id)
                 )
+                chat = result.scalar_one_or_none()
                 if not chat:
                     raise ValueError(f"Telegram chat with ID {chat_id} does not exist")
 
             # Generate a new driver ID (in a real system, this might follow a specific pattern)
             # For this example, we'll use a simple incremental ID
-            last_driver = self.db.query(Driver).order_by(Driver.id.desc()).first()
+            result = await self.db.execute(
+                select(Driver).order_by(Driver.id.desc()).limit(1)
+            )
+            last_driver = result.scalar_one_or_none()
             new_id = (last_driver.id + 1) if last_driver else 1
 
             driver = Driver(
@@ -57,17 +64,17 @@ class DriverRepository:
             )
 
             self.db.add(driver)
-            self.db.commit()
-            self.db.refresh(driver)
+            await self.db.commit()
+            await self.db.refresh(driver)
 
             return driver
 
         except SQLAlchemyError as e:
-            self.db.rollback()
-            logger.error(f"Error creating driver: {str(e)}")
+            await self.db.rollback()
+            logger.error(f"Error creating driver: {e!s}")
             raise
 
-    def get_driver_by_id(self, driver_id: int) -> Optional[Driver]:
+    async def get_driver_by_id(self, driver_id: int) -> Driver | None:
         """
         Get a driver by ID.
 
@@ -77,9 +84,10 @@ class DriverRepository:
         Returns:
             Optional[Driver]: Driver if found, None otherwise
         """
-        return self.db.query(Driver).filter(Driver.id == driver_id).first()
+        result = await self.db.execute(select(Driver).where(Driver.id == driver_id))
+        return result.scalar_one_or_none()
 
-    def get_driver_by_name(self, name: str) -> Optional[Driver]:
+    async def get_driver_by_name(self, name: str) -> Driver | None:
         """
         Get a driver by name.
 
@@ -89,9 +97,10 @@ class DriverRepository:
         Returns:
             Optional[Driver]: Driver if found, None otherwise
         """
-        return self.db.query(Driver).filter(Driver.name == name).first()
+        result = await self.db.execute(select(Driver).where(Driver.name == name))
+        return result.scalar_one_or_none()
 
-    def get_drivers_by_company(self, company_id: int) -> List[Driver]:
+    async def get_drivers_by_company(self, company_id: int) -> list[Driver]:
         """
         Get all drivers for a company.
 
@@ -101,9 +110,12 @@ class DriverRepository:
         Returns:
             List[Driver]: List of drivers for the company
         """
-        return self.db.query(Driver).filter(Driver.company_id == company_id).all()
+        result = await self.db.execute(
+            select(Driver).where(Driver.company_id == company_id)
+        )
+        return list(result.scalars().all())
 
-    def get_drivers(self, skip: int = 0, limit: int = 100) -> List[Driver]:
+    async def get_drivers(self, skip: int = 0, limit: int = 100) -> list[Driver]:
         """
         Get a list of drivers with pagination.
 
@@ -114,15 +126,16 @@ class DriverRepository:
         Returns:
             List[Driver]: List of drivers
         """
-        return self.db.query(Driver).offset(skip).limit(limit).all()
+        result = await self.db.execute(select(Driver).offset(skip).limit(limit))
+        return list(result.scalars().all())
 
-    def update_driver(
+    async def update_driver(
         self,
         driver_id: int,
-        name: Optional[str] = None,
-        company_id: Optional[int] = None,
-        chat_id: Optional[int] = None,
-    ) -> Optional[Driver]:
+        name: str | None = None,
+        company_id: int | None = None,
+        chat_id: int | None = None,
+    ) -> Driver | None:
         """
         Update a driver's information.
 
@@ -136,7 +149,10 @@ class DriverRepository:
             Optional[Driver]: Updated driver if found, None otherwise
         """
         try:
-            driver = self.db.query(Driver).filter(Driver.id == driver_id).first()
+            result = await self.db.execute(
+                select(Driver).where(Driver.id == driver_id)
+            )
+            driver = result.scalar_one_or_none()
             if not driver:
                 return None
 
@@ -145,9 +161,10 @@ class DriverRepository:
 
             if company_id is not None:
                 # Ensure company exists
-                company = (
-                    self.db.query(Company).filter(Company.id == company_id).first()
+                result = await self.db.execute(
+                    select(Company).where(Company.id == company_id)
                 )
+                company = result.scalar_one_or_none()
                 if not company:
                     raise ValueError(f"Company with ID {company_id} does not exist")
                 driver.company_id = company_id
@@ -155,28 +172,27 @@ class DriverRepository:
             if chat_id is not None:
                 # Ensure chat exists if provided
                 if chat_id > 0:
-                    chat = (
-                        self.db.query(TelegramChat)
-                        .filter(TelegramChat.id == chat_id)
-                        .first()
+                    result = await self.db.execute(
+                        select(TelegramChat).where(TelegramChat.id == chat_id)
                     )
+                    chat = result.scalar_one_or_none()
                     if not chat:
                         raise ValueError(
                             f"Telegram chat with ID {chat_id} does not exist"
                         )
                 driver.chat_id = chat_id
 
-            self.db.commit()
-            self.db.refresh(driver)
+            await self.db.commit()
+            await self.db.refresh(driver)
 
             return driver
 
         except SQLAlchemyError as e:
-            self.db.rollback()
-            logger.error(f"Error updating driver: {str(e)}")
+            await self.db.rollback()
+            logger.error(f"Error updating driver: {e!s}")
             raise
 
-    def delete_driver(self, driver_id: int) -> bool:
+    async def delete_driver(self, driver_id: int) -> bool:
         """
         Delete a driver.
 
@@ -187,16 +203,19 @@ class DriverRepository:
             bool: True if the driver was deleted, False otherwise
         """
         try:
-            driver = self.db.query(Driver).filter(Driver.id == driver_id).first()
+            result = await self.db.execute(
+                select(Driver).where(Driver.id == driver_id)
+            )
+            driver = result.scalar_one_or_none()
             if not driver:
                 return False
 
-            self.db.delete(driver)
-            self.db.commit()
+            await self.db.delete(driver)
+            await self.db.commit()
 
             return True
 
         except SQLAlchemyError as e:
-            self.db.rollback()
-            logger.error(f"Error deleting driver: {str(e)}")
+            await self.db.rollback()
+            logger.error(f"Error deleting driver: {e!s}")
             raise

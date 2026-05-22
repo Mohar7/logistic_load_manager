@@ -1,10 +1,12 @@
 # app/services/driver_service.py
-from typing import Dict, Any, List, Optional
-from sqlalchemy.orm import Session
-from app.db.repositories.driver_repository import DriverRepository
-from app.db.repositories.company_repository import CompanyRepository
-from app.db.models import Driver
 import logging
+from typing import Any
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.models import Driver
+from app.db.repositories.company_repository import CompanyRepository
+from app.db.repositories.driver_repository import DriverRepository
 
 logger = logging.getLogger(__name__)
 
@@ -14,14 +16,14 @@ class DriverService:
     Service for managing drivers.
     """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
         self.driver_repository = DriverRepository(db)
         self.company_repository = CompanyRepository(db)
 
-    def create_driver(
-        self, name: str, company_id: int, chat_id: Optional[int] = None
-    ) -> Dict[str, Any]:
+    async def create_driver(
+        self, name: str, company_id: int, chat_id: int | None = None
+    ) -> dict[str, Any]:
         """
         Create a new driver.
 
@@ -35,20 +37,22 @@ class DriverService:
         """
         try:
             # Check if company exists
-            company = self.company_repository.get_company_by_id(company_id)
+            company = await self.company_repository.get_company_by_id(company_id)
             if not company:
                 raise ValueError(f"Company with ID {company_id} does not exist")
 
             # Create the driver
-            driver = self.driver_repository.create_driver(name, company_id, chat_id)
+            driver = await self.driver_repository.create_driver(
+                name, company_id, chat_id
+            )
 
             return {"driver": driver, "company": company}
 
         except Exception as e:
-            logger.error(f"Error in create_driver: {str(e)}")
+            logger.error(f"Error in create_driver: {e!s}")
             raise
 
-    def get_driver_by_id(self, driver_id: int) -> Optional[Dict[str, Any]]:
+    async def get_driver_by_id(self, driver_id: int) -> dict[str, Any] | None:
         """
         Get a driver by ID with company information.
 
@@ -58,15 +62,15 @@ class DriverService:
         Returns:
             Optional[Dict[str, Any]]: Dictionary with driver and company information, or None if not found
         """
-        driver = self.driver_repository.get_driver_by_id(driver_id)
+        driver = await self.driver_repository.get_driver_by_id(driver_id)
         if not driver:
             return None
 
-        company = self.company_repository.get_company_by_id(driver.company_id)
+        company = await self.company_repository.get_company_by_id(driver.company_id)
 
         return {"driver": driver, "company": company}
 
-    def get_driver_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+    async def get_driver_by_name(self, name: str) -> dict[str, Any] | None:
         """
         Get a driver by name with company information.
 
@@ -76,15 +80,17 @@ class DriverService:
         Returns:
             Optional[Dict[str, Any]]: Dictionary with driver and company information, or None if not found
         """
-        driver = self.driver_repository.get_driver_by_name(name)
+        driver = await self.driver_repository.get_driver_by_name(name)
         if not driver:
             return None
 
-        company = self.company_repository.get_company_by_id(driver.company_id)
+        company = await self.company_repository.get_company_by_id(driver.company_id)
 
         return {"driver": driver, "company": company}
 
-    def get_drivers(self, skip: int = 0, limit: int = 100) -> List[Dict[str, Any]]:
+    async def get_drivers(
+        self, skip: int = 0, limit: int = 100
+    ) -> list[dict[str, Any]]:
         """
         Get all drivers with pagination.
 
@@ -95,16 +101,16 @@ class DriverService:
         Returns:
             List[Dict[str, Any]]: List of drivers with their company information
         """
-        drivers = self.driver_repository.get_drivers(skip, limit)
+        drivers = await self.driver_repository.get_drivers(skip, limit)
         result = []
 
         for driver in drivers:
-            company = self.company_repository.get_company_by_id(driver.company_id)
+            company = await self.company_repository.get_company_by_id(driver.company_id)
             result.append({"driver": driver, "company": company})
 
         return result
 
-    def get_drivers_by_company(self, company_id: int) -> List[Driver]:
+    async def get_drivers_by_company(self, company_id: int) -> list[Driver]:
         """
         Get all drivers for a specific company.
 
@@ -114,15 +120,15 @@ class DriverService:
         Returns:
             List[Driver]: List of drivers for the company
         """
-        return self.driver_repository.get_drivers_by_company(company_id)
+        return await self.driver_repository.get_drivers_by_company(company_id)
 
-    def update_driver(
+    async def update_driver(
         self,
         driver_id: int,
-        name: Optional[str] = None,
-        company_id: Optional[int] = None,
-        chat_id: Optional[int] = None,
-    ) -> Optional[Dict[str, Any]]:
+        name: str | None = None,
+        company_id: int | None = None,
+        chat_id: int | None = None,
+    ) -> dict[str, Any] | None:
         """
         Update a driver's information.
 
@@ -138,25 +144,25 @@ class DriverService:
         try:
             # Check if company exists if provided
             if company_id is not None:
-                company = self.company_repository.get_company_by_id(company_id)
+                company = await self.company_repository.get_company_by_id(company_id)
                 if not company:
                     raise ValueError(f"Company with ID {company_id} does not exist")
 
-            driver = self.driver_repository.update_driver(
+            driver = await self.driver_repository.update_driver(
                 driver_id, name, company_id, chat_id
             )
             if not driver:
                 return None
 
-            company = self.company_repository.get_company_by_id(driver.company_id)
+            company = await self.company_repository.get_company_by_id(driver.company_id)
 
             return {"driver": driver, "company": company}
 
         except Exception as e:
-            logger.error(f"Error in update_driver: {str(e)}")
+            logger.error(f"Error in update_driver: {e!s}")
             raise
 
-    def delete_driver(self, driver_id: int) -> bool:
+    async def delete_driver(self, driver_id: int) -> bool:
         """
         Delete a driver.
 
@@ -166,4 +172,4 @@ class DriverService:
         Returns:
             bool: True if the driver was deleted, False otherwise
         """
-        return self.driver_repository.delete_driver(driver_id)
+        return await self.driver_repository.delete_driver(driver_id)

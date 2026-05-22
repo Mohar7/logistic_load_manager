@@ -1,12 +1,12 @@
 # app/services/dispatcher_service.py
-from typing import Dict, Any, List, Optional
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError, NoResultFound
+import logging
+
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.repositories.dispatcher_repository import DispatcherRepository
 from app.db.repositories.load_repository import LoadRepository
-from app.schemas.dispatchers import DispatcherResponse, AddDispatcher
-import logging
+from app.schemas.dispatchers import AddDispatcher, DispatcherResponse
 
 logger = logging.getLogger(__name__)
 
@@ -16,12 +16,14 @@ class DispatcherService:
     Service class for managing dispatchers.
     """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
         self.dispatcher_repo = DispatcherRepository(db)
         self.load_repo = LoadRepository(db)
 
-    def add_dispatcher(self, dispatcher_data: AddDispatcher) -> DispatcherResponse:
+    async def add_dispatcher(
+        self, dispatcher_data: AddDispatcher
+    ) -> DispatcherResponse:
         """
         Adds a new dispatcher to the database.
 
@@ -36,7 +38,7 @@ class DispatcherService:
         """
         try:
             # Check for existing dispatcher
-            existing = self.dispatcher_repo.get_dispatcher_by_telegram_id(
+            existing = await self.dispatcher_repo.get_dispatcher_by_telegram_id(
                 dispatcher_data.telegram_id
             )
             if existing:
@@ -45,28 +47,32 @@ class DispatcherService:
                 )
 
             # Save to DB
-            self.dispatcher_repo.add_dispatcher_to_db(
+            await self.dispatcher_repo.add_dispatcher_to_db(
                 name=dispatcher_data.name, telegram_id=dispatcher_data.telegram_id
             )
 
             # Fetch created dispatcher
-            created_dispatcher = self.dispatcher_repo.get_dispatcher_by_telegram_id(
-                dispatcher_data.telegram_id
+            created_dispatcher = (
+                await self.dispatcher_repo.get_dispatcher_by_telegram_id(
+                    dispatcher_data.telegram_id
+                )
             )
             logger.info(f"Dispatcher '{dispatcher_data.name}' added successfully.")
             return DispatcherResponse.model_validate(created_dispatcher)
 
         except IntegrityError as e:
-            self.db.rollback()
-            logger.error(f"Integrity error in add_dispatcher: {str(e)}")
+            await self.db.rollback()
+            logger.error(f"Integrity error in add_dispatcher: {e!s}")
             raise ValueError(
                 f"Dispatcher with telegram_id {dispatcher_data.telegram_id} already exists."
             ) from e
         except Exception as e:
-            logger.error(f"Unexpected error in add_dispatcher: {str(e)}")
+            logger.error(f"Unexpected error in add_dispatcher: {e!s}")
             raise
 
-    def get_dispatcher_by_id(self, dispatcher_id: int) -> Optional[DispatcherResponse]:
+    async def get_dispatcher_by_id(
+        self, dispatcher_id: int
+    ) -> DispatcherResponse | None:
         """
         Retrieve a dispatcher by ID.
 
@@ -76,12 +82,12 @@ class DispatcherService:
         Returns:
             Optional[DispatcherResponse]: Dispatcher data or None if not found.
         """
-        dispatcher = self.dispatcher_repo.get_dispatcher_by_id(dispatcher_id)
+        dispatcher = await self.dispatcher_repo.get_dispatcher_by_id(dispatcher_id)
         return DispatcherResponse.model_validate(dispatcher) if dispatcher else None
 
-    def get_dispatcher_by_telegram_id(
+    async def get_dispatcher_by_telegram_id(
         self, telegram_id: int
-    ) -> Optional[DispatcherResponse]:
+    ) -> DispatcherResponse | None:
         """
         Retrieve a dispatcher by Telegram ID.
 
@@ -91,12 +97,14 @@ class DispatcherService:
         Returns:
             Optional[DispatcherResponse]: Dispatcher data or None if not found.
         """
-        dispatcher = self.dispatcher_repo.get_dispatcher_by_telegram_id(telegram_id)
+        dispatcher = await self.dispatcher_repo.get_dispatcher_by_telegram_id(
+            telegram_id
+        )
         return DispatcherResponse.model_validate(dispatcher) if dispatcher else None
 
-    def get_dispatchers(
+    async def get_dispatchers(
         self, skip: int = 0, limit: int = 100
-    ) -> List[DispatcherResponse]:
+    ) -> list[DispatcherResponse]:
         """
         Get a list of dispatchers.
 
@@ -107,15 +115,15 @@ class DispatcherService:
         Returns:
             List[DispatcherResponse]: List of dispatchers.
         """
-        dispatchers = self.dispatcher_repo.get_dispatchers(skip, limit)
+        dispatchers = await self.dispatcher_repo.get_dispatchers(skip, limit)
         return [DispatcherResponse.model_validate(d) for d in dispatchers]
 
-    def update_dispatcher(
+    async def update_dispatcher(
         self,
         dispatcher_id: int,
-        name: Optional[str] = None,
-        telegram_id: Optional[int] = None,
-    ) -> Optional[DispatcherResponse]:
+        name: str | None = None,
+        telegram_id: int | None = None,
+    ) -> DispatcherResponse | None:
         """
         Update an existing dispatcher.
 
@@ -131,7 +139,7 @@ class DispatcherService:
             ValueError: If Telegram ID is already taken.
         """
         try:
-            updated_dispatcher = self.dispatcher_repo.update_dispatcher(
+            updated_dispatcher = await self.dispatcher_repo.update_dispatcher(
                 dispatcher_id=dispatcher_id, name=name, telegram_id=telegram_id
             )
             if not updated_dispatcher:
@@ -141,14 +149,14 @@ class DispatcherService:
             logger.info(f"Dispatcher ID {dispatcher_id} updated successfully.")
             return DispatcherResponse.model_validate(updated_dispatcher)
         except IntegrityError as e:
-            self.db.rollback()
-            logger.error(f"Integrity error in update_dispatcher: {str(e)}")
+            await self.db.rollback()
+            logger.error(f"Integrity error in update_dispatcher: {e!s}")
             raise ValueError(f"Telegram ID {telegram_id} is already taken.") from e
         except Exception as e:
-            logger.error(f"Unexpected error in update_dispatcher: {str(e)}")
+            logger.error(f"Unexpected error in update_dispatcher: {e!s}")
             raise
 
-    def delete_dispatcher(self, dispatcher_id: int) -> bool:
+    async def delete_dispatcher(self, dispatcher_id: int) -> bool:
         """
         Delete a dispatcher if no loads are associated.
 
@@ -161,13 +169,15 @@ class DispatcherService:
         Raises:
             ValueError: If the dispatcher has associated loads.
         """
-        loads = self.load_repo.get_loads_by_dispatcher_id(dispatcher_id)
+        loads = await self.load_repo.get_loads_by_dispatcher_id(dispatcher_id)
         if loads:
             msg = f"Cannot delete dispatcher {dispatcher_id}: {len(loads)} loads associated."
             logger.warning(msg)
             raise ValueError(msg)
 
-        deleted = self.dispatcher_repo.delete_dispatcher(dispatcher_id=dispatcher_id)
+        deleted = await self.dispatcher_repo.delete_dispatcher(
+            dispatcher_id=dispatcher_id
+        )
         if deleted:
             logger.info(f"Dispatcher {dispatcher_id} was successfully deleted.")
         else:

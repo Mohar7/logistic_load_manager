@@ -1,12 +1,12 @@
 # app/schemas/driver.py
+
 from pydantic import BaseModel
-from typing import Optional, List
 
 
 class DriverBase(BaseModel):
     name: str
     company_id: int
-    chat_id: Optional[int] = None
+    chat_id: int | None = None
 
 
 class DriverCreate(DriverBase):
@@ -28,7 +28,7 @@ class DriverResponse(BaseModel):
     id: int
     name: str
     company_id: int
-    chat_id: Optional[int] = None
+    chat_id: int | None = None
 
     class Config:
         from_attributes = True  # Changed from orm_mode to from_attributes

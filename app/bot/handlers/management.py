@@ -1,15 +1,19 @@
 # app/bot/handlers/management.py - Unified Group and Driver Management
-from aiogram import types, F
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+import logging
+
+from aiogram import types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from sqlalchemy.orm import Session
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
+from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
 from app.bot.services.chat_service import ChatService
-from app.bot.utils.formatters import escape_markdown
 from app.bot.utils.error_handling import safe_callback_handler, safe_message_handler
-from app.db.models import Driver, TelegramChat, Company
-import logging
+from app.bot.utils.formatters import escape_markdown
+from app.db.models import Company, Driver, TelegramChat
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +24,7 @@ class ManagementStates(StatesGroup):
     waiting_for_chat_id = State()
     waiting_for_forward = State()
     confirming_chat_selection = State()
-    
+
     # Driver management states
     waiting_for_driver_name = State()
     waiting_for_company_selection = State()
@@ -33,7 +37,7 @@ class UnifiedManagementHandler:
     """Unified handler for both group and driver management"""
 
     # ==================== GROUP MANAGEMENT ====================
-    
+
     @staticmethod
     @safe_callback_handler
     async def handle_add_group_menu(callback: CallbackQuery, state: FSMContext, user_data: dict):
@@ -117,7 +121,7 @@ class UnifiedManagementHandler:
 
     @staticmethod
     @safe_message_handler
-    async def handle_username_input(message: types.Message, state: FSMContext, db: Session):
+    async def handle_username_input(message: types.Message, state: FSMContext, db: AsyncSession):
         """Handle username input for chat addition"""
         if message.text.lower() in ["/cancel", "cancel"]:
             await state.clear()
@@ -130,6 +134,7 @@ class UnifiedManagementHandler:
 
         try:
             from aiogram import Bot
+
             from app.config import get_settings
 
             settings = get_settings()
@@ -158,7 +163,7 @@ class UnifiedManagementHandler:
                 chat_name = chat.title or chat.first_name or chat.username
                 chat_name_escaped = escape_markdown(chat_name)
                 username_escaped = escape_markdown(username)
-                
+
                 confirmation_text = (
                     f"🔍 *Found Chat:*\n\n"
                     f"*Name:* {chat_name_escaped}\n"
@@ -196,7 +201,7 @@ class UnifiedManagementHandler:
 
     @staticmethod
     @safe_message_handler
-    async def handle_chat_id_input(message: types.Message, state: FSMContext, db: Session):
+    async def handle_chat_id_input(message: types.Message, state: FSMContext, db: AsyncSession):
         """Handle chat ID input for chat addition"""
         if message.text.lower() in ["/cancel", "cancel"]:
             await state.clear()
@@ -205,8 +210,9 @@ class UnifiedManagementHandler:
 
         try:
             chat_id = int(message.text.strip())
-            
+
             from aiogram import Bot
+
             from app.config import get_settings
 
             settings = get_settings()
@@ -282,7 +288,7 @@ class UnifiedManagementHandler:
 
     @staticmethod
     @safe_message_handler
-    async def handle_forward_message(message: types.Message, state: FSMContext, db: Session):
+    async def handle_forward_message(message: types.Message, state: FSMContext, db: AsyncSession):
         """Handle forwarded message for chat addition"""
         if message.text and message.text.lower() in ["/cancel", "cancel"]:
             await state.clear()
@@ -351,7 +357,7 @@ class UnifiedManagementHandler:
 
     @staticmethod
     @safe_callback_handler
-    async def handle_confirm_add_chat(callback: CallbackQuery, state: FSMContext, db: Session):
+    async def handle_confirm_add_chat(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
         """Confirm and add the selected chat"""
         try:
             state_data = await state.get_data()
@@ -383,8 +389,8 @@ class UnifiedManagementHandler:
                 )
             else:
                 await callback.message.edit_text(
-                    f"❌ *Failed to Add Chat*\n\n"
-                    f"Chat may already exist in the system.",
+                    "❌ *Failed to Add Chat*\n\n"
+                    "Chat may already exist in the system.",
                     reply_markup=InlineKeyboardMarkup(
                         inline_keyboard=[
                             [InlineKeyboardButton(text="🔙 Back", callback_data="manage_groups")]
@@ -426,21 +432,34 @@ class UnifiedManagementHandler:
         await callback.answer()
 
     # ==================== DRIVER MANAGEMENT ====================
-    
+
     @staticmethod
     @safe_callback_handler
-    async def handle_manage_drivers(callback: CallbackQuery, user_data: dict, db: Session):
+    async def handle_manage_drivers(callback: CallbackQuery, user_data: dict, db: AsyncSession):
         """Main driver management menu"""
         if not user_data or user_data["role"] != "manager":
             await callback.answer("Access denied!", show_alert=True)
             return
 
         # Get driver statistics
-        total_drivers = db.query(Driver).count()
-        drivers_with_chats = db.query(Driver).filter(Driver.chat_id.isnot(None)).count()
-        unassigned_chats = db.query(TelegramChat).filter(
-            ~TelegramChat.id.in_(db.query(Driver.chat_id).filter(Driver.chat_id.isnot(None)))
-        ).count()
+        total_drivers = (
+            await db.execute(select(func.count()).select_from(Driver))
+        ).scalar_one()
+        drivers_with_chats = (
+            await db.execute(
+                select(func.count()).select_from(Driver).where(Driver.chat_id.isnot(None))
+            )
+        ).scalar_one()
+        assigned_chat_ids_subq = (
+            select(Driver.chat_id).where(Driver.chat_id.isnot(None))
+        )
+        unassigned_chats = (
+            await db.execute(
+                select(func.count())
+                .select_from(TelegramChat)
+                .where(~TelegramChat.id.in_(assigned_chat_ids_subq))
+            )
+        ).scalar_one()
 
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
@@ -480,7 +499,7 @@ class UnifiedManagementHandler:
 
     @staticmethod
     @safe_message_handler
-    async def handle_driver_name_input(message: types.Message, state: FSMContext, db: Session):
+    async def handle_driver_name_input(message: types.Message, state: FSMContext, db: AsyncSession):
         """Handle driver name input"""
         if message.text.lower() in ["/cancel", "cancel"]:
             await state.clear()
@@ -494,10 +513,10 @@ class UnifiedManagementHandler:
 
         # Store driver name and show company selection
         await state.update_data(driver_name=driver_name)
-        
+
         # Get available companies
-        companies = db.query(Company).all()
-        
+        companies = list((await db.execute(select(Company))).scalars().all())
+
         if not companies:
             await message.answer("❌ No companies found. Please add a company first.")
             await state.clear()
@@ -521,15 +540,17 @@ class UnifiedManagementHandler:
 
     @staticmethod
     @safe_callback_handler
-    async def handle_company_selection(callback: CallbackQuery, state: FSMContext, db: Session):
+    async def handle_company_selection(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
         """Handle company selection for driver"""
         if not callback.data.startswith("select_company_"):
             await callback.answer("Invalid selection!", show_alert=True)
             return
 
         company_id = int(callback.data.split("_")[2])
-        company = db.query(Company).filter(Company.id == company_id).first()
-        
+        company = (
+            await db.execute(select(Company).where(Company.id == company_id))
+        ).scalar_one_or_none()
+
         if not company:
             await callback.answer("Company not found!", show_alert=True)
             return
@@ -546,7 +567,7 @@ class UnifiedManagementHandler:
 
         driver_name_escaped = escape_markdown(state_data['driver_name'])
         company_name_escaped = escape_markdown(company.name)
-        
+
         await callback.message.edit_text(
             f"👤 *Confirm Driver Creation*\n\n"
             f"*Name:* {driver_name_escaped}\n"
@@ -559,21 +580,21 @@ class UnifiedManagementHandler:
 
     @staticmethod
     @safe_callback_handler
-    async def handle_confirm_create_driver(callback: CallbackQuery, state: FSMContext, db: Session):
+    async def handle_confirm_create_driver(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
         """Confirm and create the driver"""
         try:
             state_data = await state.get_data()
-            
+
             # Create the driver
             new_driver = Driver(
                 name=state_data['driver_name'],
                 company_id=state_data['company_id'],
                 chat_id=None  # Will be assigned later
             )
-            
+
             db.add(new_driver)
-            db.commit()
-            db.refresh(new_driver)
+            await db.commit()
+            await db.refresh(new_driver)
 
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
@@ -586,7 +607,7 @@ class UnifiedManagementHandler:
 
             driver_name_escaped = escape_markdown(state_data['driver_name'])
             company_name_escaped = escape_markdown(state_data['company_name'])
-            
+
             await callback.message.edit_text(
                 f"✅ *Driver Created Successfully!*\n\n"
                 f"*Name:* {driver_name_escaped}\n"
@@ -600,7 +621,7 @@ class UnifiedManagementHandler:
 
         except SQLAlchemyError as e:
             logger.error(f"Error creating driver: {e}")
-            db.rollback()
+            await db.rollback()
             await callback.message.edit_text(
                 "❌ *Error Creating Driver*\n\nDatabase error occurred. Please try again.",
                 reply_markup=InlineKeyboardMarkup(
@@ -631,14 +652,20 @@ class UnifiedManagementHandler:
         await callback.answer()
 
     # ==================== DRIVER-CHAT ASSIGNMENT ====================
-    
+
     @staticmethod
     @safe_callback_handler
-    async def handle_assign_driver_to_chat(callback: CallbackQuery, db: Session):
+    async def handle_assign_driver_to_chat(callback: CallbackQuery, db: AsyncSession):
         """Show drivers without chats for assignment"""
         # Get drivers without chat assignments
-        drivers_without_chats = db.query(Driver).filter(Driver.chat_id.is_(None)).all()
-        
+        drivers_without_chats = list((
+            await db.execute(
+                select(Driver)
+                .options(selectinload(Driver.company))
+                .where(Driver.chat_id.is_(None))
+            )
+        ).scalars().all())
+
         if not drivers_without_chats:
             await callback.message.edit_text(
                 "✅ *All Drivers Have Chats*\n\n"
@@ -654,14 +681,14 @@ class UnifiedManagementHandler:
             return
 
         keyboard_buttons = []
-        text = f"🔗 *Assign Chat to Driver*\n\n"
-        text += f"Select a driver to assign a chat to:\n\n"
+        text = "🔗 *Assign Chat to Driver*\n\n"
+        text += "Select a driver to assign a chat to:\n\n"
 
         for driver in drivers_without_chats[:10]:  # Limit to 10 for display
             company_name = driver.company.name if driver.company else "No Company"
             driver_escaped = escape_markdown(driver.name)
             company_escaped = escape_markdown(company_name)
-            
+
             text += f"• {driver_escaped} ({company_escaped})\n"
             keyboard_buttons.append([
                 InlineKeyboardButton(
@@ -683,19 +710,30 @@ class UnifiedManagementHandler:
 
     @staticmethod
     @safe_callback_handler
-    async def handle_select_driver_for_chat(callback: CallbackQuery, db: Session):
+    async def handle_select_driver_for_chat(callback: CallbackQuery, db: AsyncSession):
         """Select available chat for driver"""
         driver_id = int(callback.data.split("_")[4])
-        driver = db.query(Driver).filter(Driver.id == driver_id).first()
-        
+        driver = (
+            await db.execute(
+                select(Driver)
+                .options(selectinload(Driver.company))
+                .where(Driver.id == driver_id)
+            )
+        ).scalar_one_or_none()
+
         if not driver:
             await callback.answer("Driver not found!", show_alert=True)
             return
 
         # Get unassigned chats
-        unassigned_chats = db.query(TelegramChat).filter(
-            ~TelegramChat.id.in_(db.query(Driver.chat_id).filter(Driver.chat_id.isnot(None)))
-        ).all()
+        assigned_chat_ids_subq = (
+            select(Driver.chat_id).where(Driver.chat_id.isnot(None))
+        )
+        unassigned_chats = list((
+            await db.execute(
+                select(TelegramChat).where(~TelegramChat.id.in_(assigned_chat_ids_subq))
+            )
+        ).scalars().all())
 
         if not unassigned_chats:
             await callback.message.edit_text(
@@ -716,11 +754,11 @@ class UnifiedManagementHandler:
         driver_name_escaped = escape_markdown(driver.name)
         company_name = driver.company.name if driver.company else "No Company"
         company_escaped = escape_markdown(company_name)
-        
+
         text = f"🔗 *Assign Chat to {driver_name_escaped}*\n\n"
         text += f"*Driver:* {driver_name_escaped}\n"
         text += f"*Company:* {company_escaped}\n\n"
-        text += f"Select a chat to assign:\n\n"
+        text += "Select a chat to assign:\n\n"
 
         for chat in unassigned_chats[:10]:  # Limit to 10
             chat_name_escaped = escape_markdown(chat.group_name)
@@ -745,29 +783,43 @@ class UnifiedManagementHandler:
 
     @staticmethod
     @safe_callback_handler
-    async def handle_confirm_assign_chat(callback: CallbackQuery, db: Session):
+    async def handle_confirm_assign_chat(callback: CallbackQuery, db: AsyncSession):
         """Confirm and assign chat to driver"""
         parts = callback.data.split("_")
         driver_id = int(parts[3])
         chat_id = int(parts[4])
 
         try:
-            driver = db.query(Driver).filter(Driver.id == driver_id).first()
-            chat = db.query(TelegramChat).filter(TelegramChat.id == chat_id).first()
+            driver = (
+                await db.execute(
+                    select(Driver)
+                    .options(selectinload(Driver.company))
+                    .where(Driver.id == driver_id)
+                )
+            ).scalar_one_or_none()
+            chat = (
+                await db.execute(
+                    select(TelegramChat).where(TelegramChat.id == chat_id)
+                )
+            ).scalar_one_or_none()
 
             if not driver or not chat:
                 await callback.answer("Driver or chat not found!", show_alert=True)
                 return
 
             # Check if chat is already assigned
-            existing_assignment = db.query(Driver).filter(Driver.chat_id == chat_id).first()
+            existing_assignment = (
+                await db.execute(
+                    select(Driver).where(Driver.chat_id == chat_id)
+                )
+            ).scalar_one_or_none()
             if existing_assignment:
                 await callback.answer("Chat is already assigned to another driver!", show_alert=True)
                 return
 
             # Assign chat to driver
             driver.chat_id = chat_id
-            db.commit()
+            await db.commit()
 
             driver_name_escaped = escape_markdown(driver.name)
             chat_name_escaped = escape_markdown(chat.group_name)
@@ -793,19 +845,25 @@ class UnifiedManagementHandler:
 
         except SQLAlchemyError as e:
             logger.error(f"Error assigning chat to driver: {e}")
-            db.rollback()
+            await db.rollback()
             await callback.answer("Error assigning chat!", show_alert=True)
 
         await callback.answer()
 
     # ==================== LIST VIEWS ====================
-    
+
     @staticmethod
     @safe_callback_handler
-    async def handle_list_drivers(callback: CallbackQuery, db: Session):
+    async def handle_list_drivers(callback: CallbackQuery, db: AsyncSession):
         """List all drivers with their chat assignments"""
-        drivers = db.query(Driver).join(Company, Driver.company_id == Company.id, isouter=True).all()
-        
+        drivers = list((
+            await db.execute(
+                select(Driver)
+                .options(selectinload(Driver.company))
+                .join(Company, Driver.company_id == Company.id, isouter=True)
+            )
+        ).scalars().all())
+
         if not drivers:
             await callback.message.edit_text(
                 "👤 *No Drivers Found*\n\nNo drivers in the system yet.",
@@ -820,24 +878,24 @@ class UnifiedManagementHandler:
             return
 
         text = f"👥 *All Drivers ({len(drivers)})*\n\n"
-        
+
         # Group by company
         current_company = None
         for driver in drivers:
             company_name = driver.company.name if driver.company else "No Company"
-            
+
             if company_name != current_company:
                 if current_company is not None:
                     text += "\n"
                 company_escaped = escape_markdown(company_name)
                 text += f"*🏢 {company_escaped}:*\n"
                 current_company = company_name
-            
+
             driver_name_escaped = escape_markdown(driver.name)
             chat_status = "📱" if driver.chat_id else "❌"
             text += f"• {driver_name_escaped} {chat_status}\n"
 
-        text += f"\n*Legend:*\n📱 = Has chat assigned\n❌ = No chat assigned"
+        text += "\n*Legend:*\n📱 = Has chat assigned\n❌ = No chat assigned"
 
         await callback.message.edit_text(
             text,
@@ -854,14 +912,14 @@ class UnifiedManagementHandler:
 
     @staticmethod
     @safe_callback_handler
-    async def handle_list_groups(callback: CallbackQuery, db: Session, user_data: dict):
+    async def handle_list_groups(callback: CallbackQuery, db: AsyncSession, user_data: dict):
         """List all chats with their driver assignments"""
         if not user_data or user_data["role"] != "manager":
             await callback.answer("Access denied!", show_alert=True)
             return
 
-        chats = db.query(TelegramChat).all()
-        
+        chats = list((await db.execute(select(TelegramChat))).scalars().all())
+
         if not chats:
             await callback.message.edit_text(
                 "📋 *No Chats Found*\n\nNo chats in the system yet.",
@@ -879,17 +937,21 @@ class UnifiedManagementHandler:
 
         for i, chat in enumerate(chats, 1):
             # Find driver assigned to this chat
-            assigned_driver = db.query(Driver).filter(Driver.chat_id == chat.id).first()
-            
+            assigned_driver = (
+                await db.execute(
+                    select(Driver).where(Driver.chat_id == chat.id)
+                )
+            ).scalar_one_or_none()
+
             chat_name_escaped = escape_markdown(chat.group_name)
             text += f"{i}. *{chat_name_escaped}*\n"
             text += f"   ID: `{chat.chat_token}`\n"
-            
+
             if assigned_driver:
                 driver_name_escaped = escape_markdown(assigned_driver.name)
                 text += f"   👤 Driver: {driver_name_escaped}\n"
             else:
-                text += f"   ❌ Unassigned\n"
+                text += "   ❌ Unassigned\n"
             text += "\n"
 
         keyboard_buttons = [
