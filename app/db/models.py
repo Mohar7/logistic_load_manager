@@ -1,4 +1,6 @@
-# app/db/models.py - Updated to handle facility names and IDs
+# app/db/models.py
+from datetime import UTC, datetime
+
 from sqlalchemy import (
     BIGINT,
     Boolean,
@@ -188,4 +190,9 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(String(32), nullable=False, default="dispatcher")
     is_active = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime, nullable=False, server_default="now()")
+    # Python-side default works on every backend (SQLite tests, Postgres prod).
+    # The Alembic migration also sets server_default='now()' so an out-of-band
+    # INSERT (psql, raw SQL) still gets a timestamp.
+    created_at = Column(
+        DateTime, nullable=False, default=lambda: datetime.now(UTC)
+    )
