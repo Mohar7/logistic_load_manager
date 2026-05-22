@@ -75,9 +75,7 @@ async def get_company(company_id: int, db: AsyncSession = Depends(get_db)):
     result = await company_service.get_company_by_id(company_id)
 
     if not result:
-        raise HTTPException(
-            status_code=404, detail=f"Company with ID {company_id} not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Company with ID {company_id} not found")
 
     company_data = result["company"]
     return {
@@ -91,9 +89,7 @@ async def get_company(company_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/", response_model=list[CompanyResponse])
-async def get_companies(
-    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)
-):
+async def get_companies(skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)):
     """
     Get all companies with pagination.
 
@@ -153,9 +149,7 @@ async def update_company(
         )
 
         if not result:
-            raise HTTPException(
-                status_code=404, detail=f"Company with ID {company_id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Company with ID {company_id} not found")
 
         company_data = result["company"]
         return {
@@ -190,9 +184,7 @@ async def delete_company(company_id: int, db: AsyncSession = Depends(get_db)):
         result = await company_service.delete_company(company_id)
 
         if not result:
-            raise HTTPException(
-                status_code=404, detail=f"Company with ID {company_id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Company with ID {company_id} not found")
 
         return {"message": f"Company with ID {company_id} successfully deleted"}
     except ValueError as e:

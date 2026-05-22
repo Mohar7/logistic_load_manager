@@ -18,9 +18,7 @@ class AdminHandler:
         from app.db.models import Driver, Load, TelegramChat
 
         try:
-            total_loads = (
-                await db.execute(select(func.count()).select_from(Load))
-            ).scalar_one()
+            total_loads = (await db.execute(select(func.count()).select_from(Load))).scalar_one()
             total_drivers = (
                 await db.execute(select(func.count()).select_from(Driver))
             ).scalar_one()
@@ -29,16 +27,12 @@ class AdminHandler:
             ).scalar_one()
             active_loads = (
                 await db.execute(
-                    select(func.count())
-                    .select_from(Load)
-                    .where(Load.assigned_driver.isnot(None))
+                    select(func.count()).select_from(Load).where(Load.assigned_driver.isnot(None))
                 )
             ).scalar_one()
             unassigned_loads = (
                 await db.execute(
-                    select(func.count())
-                    .select_from(Load)
-                    .where(Load.assigned_driver.is_(None))
+                    select(func.count()).select_from(Load).where(Load.assigned_driver.is_(None))
                 )
             ).scalar_one()
 
@@ -58,11 +52,7 @@ Recent Activity:
                 stats_text,
                 reply_markup=InlineKeyboardMarkup(
                     inline_keyboard=[
-                        [
-                            InlineKeyboardButton(
-                                text="🔙 Back", callback_data="back_to_menu"
-                            )
-                        ]
+                        [InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")]
                     ]
                 ),
             )
@@ -73,11 +63,7 @@ Recent Activity:
                 "❌ Error retrieving system statistics.",
                 reply_markup=InlineKeyboardMarkup(
                     inline_keyboard=[
-                        [
-                            InlineKeyboardButton(
-                                text="🔙 Back", callback_data="back_to_menu"
-                            )
-                        ]
+                        [InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")]
                     ]
                 ),
             )

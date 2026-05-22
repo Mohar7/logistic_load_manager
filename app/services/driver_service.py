@@ -42,9 +42,7 @@ class DriverService:
                 raise ValueError(f"Company with ID {company_id} does not exist")
 
             # Create the driver
-            driver = await self.driver_repository.create_driver(
-                name, company_id, chat_id
-            )
+            driver = await self.driver_repository.create_driver(name, company_id, chat_id)
 
             return {"driver": driver, "company": company}
 
@@ -88,9 +86,7 @@ class DriverService:
 
         return {"driver": driver, "company": company}
 
-    async def get_drivers(
-        self, skip: int = 0, limit: int = 100
-    ) -> list[dict[str, Any]]:
+    async def get_drivers(self, skip: int = 0, limit: int = 100) -> list[dict[str, Any]]:
         """
         Get all drivers with pagination.
 

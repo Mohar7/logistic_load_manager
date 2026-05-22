@@ -48,7 +48,11 @@ class UnifiedManagementHandler:
 
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="🔍 Search by Username", callback_data="add_by_username")],
+                [
+                    InlineKeyboardButton(
+                        text="🔍 Search by Username", callback_data="add_by_username"
+                    )
+                ],
                 [InlineKeyboardButton(text="🆔 Enter Chat ID", callback_data="add_by_chat_id")],
                 [InlineKeyboardButton(text="📨 Forward Message", callback_data="add_by_forward")],
                 [InlineKeyboardButton(text="🔙 Back", callback_data="manage_groups")],
@@ -155,7 +159,11 @@ class UnifiedManagementHandler:
 
                 keyboard = InlineKeyboardMarkup(
                     inline_keyboard=[
-                        [InlineKeyboardButton(text="✅ Add This Chat", callback_data="confirm_add_chat")],
+                        [
+                            InlineKeyboardButton(
+                                text="✅ Add This Chat", callback_data="confirm_add_chat"
+                            )
+                        ],
                         [InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_add_chat")],
                     ]
                 )
@@ -173,7 +181,9 @@ class UnifiedManagementHandler:
                     f"Add this chat to the system?"
                 )
 
-                await message.answer(confirmation_text, reply_markup=keyboard, parse_mode="Markdown")
+                await message.answer(
+                    confirmation_text, reply_markup=keyboard, parse_mode="Markdown"
+                )
 
             except Exception as e:
                 await bot_instance.session.close()
@@ -192,7 +202,7 @@ class UnifiedManagementHandler:
                     f"1. Check the username is correct\n"
                     f"2. Add the bot to the chat first\n"
                     f"3. Try using chat ID method instead",
-                    parse_mode="Markdown"
+                    parse_mode="Markdown",
                 )
 
         except Exception as e:
@@ -233,14 +243,20 @@ class UnifiedManagementHandler:
 
                 keyboard = InlineKeyboardMarkup(
                     inline_keyboard=[
-                        [InlineKeyboardButton(text="✅ Add This Chat", callback_data="confirm_add_chat")],
+                        [
+                            InlineKeyboardButton(
+                                text="✅ Add This Chat", callback_data="confirm_add_chat"
+                            )
+                        ],
                         [InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_add_chat")],
                     ]
                 )
 
                 chat_name = chat.title or chat.first_name or f"Chat_{chat.id}"
                 chat_name_escaped = escape_markdown(chat_name)
-                username_text = f"@{chat.username}" if getattr(chat, "username", None) else "No username"
+                username_text = (
+                    f"@{chat.username}" if getattr(chat, "username", None) else "No username"
+                )
 
                 confirmation_text = (
                     f"🆔 *Found Chat:*\n\n"
@@ -251,7 +267,9 @@ class UnifiedManagementHandler:
                     f"Add this chat to the system?"
                 )
 
-                await message.answer(confirmation_text, reply_markup=keyboard, parse_mode="Markdown")
+                await message.answer(
+                    confirmation_text, reply_markup=keyboard, parse_mode="Markdown"
+                )
 
             except Exception as e:
                 await bot_instance.session.close()
@@ -270,7 +288,7 @@ class UnifiedManagementHandler:
                     f"1. Make sure the bot has access to the chat\n"
                     f"2. Try forwarding a message instead\n"
                     f"3. Double-check the chat ID is correct",
-                    parse_mode="Markdown"
+                    parse_mode="Markdown",
                 )
 
         except ValueError:
@@ -280,7 +298,7 @@ class UnifiedManagementHandler:
                 "*Examples:*\n"
                 "• `-1001234567890` (group)\n"
                 "• `123456789` (private chat)",
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             )
         except Exception as e:
             logger.error(f"Error in chat ID input: {e}")
@@ -309,7 +327,7 @@ class UnifiedManagementHandler:
                 "*Please use:*\n"
                 "1. Get chat ID with @userinfobot\n"
                 "2. Use 'Enter Chat ID' method",
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             )
             return
 
@@ -320,14 +338,14 @@ class UnifiedManagementHandler:
                 "1. Forward a message from the target chat\n"
                 "2. Use 'Enter Chat ID' method\n"
                 "3. Use username method if available",
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             )
             return
 
         # Store chat info for confirmation
         await state.update_data(
             chat_id=chat_info.id,
-            chat_title=chat_info.title or getattr(chat_info, 'first_name', f"Chat_{chat_info.id}"),
+            chat_title=chat_info.title or getattr(chat_info, "first_name", f"Chat_{chat_info.id}"),
             chat_username=getattr(chat_info, "username", None),
             chat_type=chat_info.type,
         )
@@ -340,9 +358,11 @@ class UnifiedManagementHandler:
             ]
         )
 
-        chat_name = chat_info.title or getattr(chat_info, 'first_name', f"Chat_{chat_info.id}")
+        chat_name = chat_info.title or getattr(chat_info, "first_name", f"Chat_{chat_info.id}")
         chat_name_escaped = escape_markdown(chat_name)
-        username_text = f"@{chat_info.username}" if getattr(chat_info, "username", None) else "No username"
+        username_text = (
+            f"@{chat_info.username}" if getattr(chat_info, "username", None) else "No username"
+        )
 
         confirmation_text = (
             f"📨 *Chat Detected:*\n\n"
@@ -370,7 +390,7 @@ class UnifiedManagementHandler:
             )
 
             if success:
-                chat_name_escaped = escape_markdown(state_data['chat_title'])
+                chat_name_escaped = escape_markdown(state_data["chat_title"])
                 await callback.message.edit_text(
                     f"✅ *Chat Added Successfully!*\n\n"
                     f"*Name:* {chat_name_escaped}\n"
@@ -380,8 +400,17 @@ class UnifiedManagementHandler:
                     f"You can now assign it to a driver.",
                     reply_markup=InlineKeyboardMarkup(
                         inline_keyboard=[
-                            [InlineKeyboardButton(text="👤 Assign to Driver", callback_data="assign_chat_to_driver")],
-                            [InlineKeyboardButton(text="📋 View All Chats", callback_data="list_groups")],
+                            [
+                                InlineKeyboardButton(
+                                    text="👤 Assign to Driver",
+                                    callback_data="assign_chat_to_driver",
+                                )
+                            ],
+                            [
+                                InlineKeyboardButton(
+                                    text="📋 View All Chats", callback_data="list_groups"
+                                )
+                            ],
                             [InlineKeyboardButton(text="🔙 Back", callback_data="manage_groups")],
                         ]
                     ),
@@ -389,8 +418,7 @@ class UnifiedManagementHandler:
                 )
             else:
                 await callback.message.edit_text(
-                    "❌ *Failed to Add Chat*\n\n"
-                    "Chat may already exist in the system.",
+                    "❌ *Failed to Add Chat*\n\n" "Chat may already exist in the system.",
                     reply_markup=InlineKeyboardMarkup(
                         inline_keyboard=[
                             [InlineKeyboardButton(text="🔙 Back", callback_data="manage_groups")]
@@ -408,7 +436,7 @@ class UnifiedManagementHandler:
                         [InlineKeyboardButton(text="🔙 Back", callback_data="manage_groups")]
                     ]
                 ),
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             )
 
         await state.clear()
@@ -427,7 +455,7 @@ class UnifiedManagementHandler:
                     [InlineKeyboardButton(text="🔙 Back", callback_data="manage_groups")],
                 ]
             ),
-            parse_mode="Markdown"
+            parse_mode="Markdown",
         )
         await callback.answer()
 
@@ -442,17 +470,13 @@ class UnifiedManagementHandler:
             return
 
         # Get driver statistics
-        total_drivers = (
-            await db.execute(select(func.count()).select_from(Driver))
-        ).scalar_one()
+        total_drivers = (await db.execute(select(func.count()).select_from(Driver))).scalar_one()
         drivers_with_chats = (
             await db.execute(
                 select(func.count()).select_from(Driver).where(Driver.chat_id.isnot(None))
             )
         ).scalar_one()
-        assigned_chat_ids_subq = (
-            select(Driver.chat_id).where(Driver.chat_id.isnot(None))
-        )
+        assigned_chat_ids_subq = select(Driver.chat_id).where(Driver.chat_id.isnot(None))
         unassigned_chats = (
             await db.execute(
                 select(func.count())
@@ -465,7 +489,11 @@ class UnifiedManagementHandler:
             inline_keyboard=[
                 [InlineKeyboardButton(text="➕ Add New Driver", callback_data="add_driver")],
                 [InlineKeyboardButton(text="👤 View All Drivers", callback_data="list_drivers")],
-                [InlineKeyboardButton(text="🔗 Assign Driver to Chat", callback_data="assign_driver_to_chat")],
+                [
+                    InlineKeyboardButton(
+                        text="🔗 Assign Driver to Chat", callback_data="assign_driver_to_chat"
+                    )
+                ],
                 [InlineKeyboardButton(text="📊 Driver Statistics", callback_data="driver_stats")],
                 [InlineKeyboardButton(text="🔙 Back to Menu", callback_data="back_to_menu")],
             ]
@@ -493,7 +521,7 @@ class UnifiedManagementHandler:
             "Enter the driver's full name:\n\n"
             "*Example:* John Smith\n\n"
             "*Cancel:* Send /cancel",
-            parse_mode="Markdown"
+            parse_mode="Markdown",
         )
         await callback.answer()
 
@@ -524,23 +552,29 @@ class UnifiedManagementHandler:
 
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text=company.name, callback_data=f"select_company_{company.id}")]
+                [
+                    InlineKeyboardButton(
+                        text=company.name, callback_data=f"select_company_{company.id}"
+                    )
+                ]
                 for company in companies
-            ] + [[InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_add_driver")]]
+            ]
+            + [[InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_add_driver")]]
         )
 
         await state.set_state(ManagementStates.waiting_for_company_selection)
         driver_name_escaped = escape_markdown(driver_name)
         await message.answer(
-            f"👤 *Adding Driver: {driver_name_escaped}*\n\n"
-            f"Select the company for this driver:",
+            f"👤 *Adding Driver: {driver_name_escaped}*\n\n" f"Select the company for this driver:",
             reply_markup=keyboard,
-            parse_mode="Markdown"
+            parse_mode="Markdown",
         )
 
     @staticmethod
     @safe_callback_handler
-    async def handle_company_selection(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
+    async def handle_company_selection(
+        callback: CallbackQuery, state: FSMContext, db: AsyncSession
+    ):
         """Handle company selection for driver"""
         if not callback.data.startswith("select_company_"):
             await callback.answer("Invalid selection!", show_alert=True)
@@ -560,12 +594,16 @@ class UnifiedManagementHandler:
 
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="✅ Create Driver", callback_data="confirm_create_driver")],
+                [
+                    InlineKeyboardButton(
+                        text="✅ Create Driver", callback_data="confirm_create_driver"
+                    )
+                ],
                 [InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_add_driver")],
             ]
         )
 
-        driver_name_escaped = escape_markdown(state_data['driver_name'])
+        driver_name_escaped = escape_markdown(state_data["driver_name"])
         company_name_escaped = escape_markdown(company.name)
 
         await callback.message.edit_text(
@@ -574,22 +612,24 @@ class UnifiedManagementHandler:
             f"*Company:* {company_name_escaped}\n\n"
             f"Create this driver?",
             reply_markup=keyboard,
-            parse_mode="Markdown"
+            parse_mode="Markdown",
         )
         await callback.answer()
 
     @staticmethod
     @safe_callback_handler
-    async def handle_confirm_create_driver(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
+    async def handle_confirm_create_driver(
+        callback: CallbackQuery, state: FSMContext, db: AsyncSession
+    ):
         """Confirm and create the driver"""
         try:
             state_data = await state.get_data()
 
             # Create the driver
             new_driver = Driver(
-                name=state_data['driver_name'],
-                company_id=state_data['company_id'],
-                chat_id=None  # Will be assigned later
+                name=state_data["driver_name"],
+                company_id=state_data["company_id"],
+                chat_id=None,  # Will be assigned later
             )
 
             db.add(new_driver)
@@ -598,15 +638,28 @@ class UnifiedManagementHandler:
 
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="🔗 Assign Chat Now", callback_data=f"assign_chat_to_driver_{new_driver.id}")],
-                    [InlineKeyboardButton(text="➕ Add Another Driver", callback_data="add_driver")],
-                    [InlineKeyboardButton(text="👤 View All Drivers", callback_data="list_drivers")],
+                    [
+                        InlineKeyboardButton(
+                            text="🔗 Assign Chat Now",
+                            callback_data=f"assign_chat_to_driver_{new_driver.id}",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="➕ Add Another Driver", callback_data="add_driver"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="👤 View All Drivers", callback_data="list_drivers"
+                        )
+                    ],
                     [InlineKeyboardButton(text="🔙 Back", callback_data="manage_drivers")],
                 ]
             )
 
-            driver_name_escaped = escape_markdown(state_data['driver_name'])
-            company_name_escaped = escape_markdown(state_data['company_name'])
+            driver_name_escaped = escape_markdown(state_data["driver_name"])
+            company_name_escaped = escape_markdown(state_data["company_name"])
 
             await callback.message.edit_text(
                 f"✅ *Driver Created Successfully!*\n\n"
@@ -616,7 +669,7 @@ class UnifiedManagementHandler:
                 f"🎉 Driver added to the system!\n"
                 f"You can now assign a chat to this driver.",
                 reply_markup=keyboard,
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             )
 
         except SQLAlchemyError as e:
@@ -629,7 +682,7 @@ class UnifiedManagementHandler:
                         [InlineKeyboardButton(text="🔙 Back", callback_data="manage_drivers")]
                     ]
                 ),
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             )
 
         await state.clear()
@@ -647,7 +700,7 @@ class UnifiedManagementHandler:
                     [InlineKeyboardButton(text="🔙 Back", callback_data="manage_drivers")]
                 ]
             ),
-            parse_mode="Markdown"
+            parse_mode="Markdown",
         )
         await callback.answer()
 
@@ -658,25 +711,32 @@ class UnifiedManagementHandler:
     async def handle_assign_driver_to_chat(callback: CallbackQuery, db: AsyncSession):
         """Show drivers without chats for assignment"""
         # Get drivers without chat assignments
-        drivers_without_chats = list((
-            await db.execute(
-                select(Driver)
-                .options(selectinload(Driver.company))
-                .where(Driver.chat_id.is_(None))
+        drivers_without_chats = list(
+            (
+                await db.execute(
+                    select(Driver)
+                    .options(selectinload(Driver.company))
+                    .where(Driver.chat_id.is_(None))
+                )
             )
-        ).scalars().all())
+            .scalars()
+            .all()
+        )
 
         if not drivers_without_chats:
             await callback.message.edit_text(
-                "✅ *All Drivers Have Chats*\n\n"
-                "All drivers are already assigned to chats.",
+                "✅ *All Drivers Have Chats*\n\n" "All drivers are already assigned to chats.",
                 reply_markup=InlineKeyboardMarkup(
                     inline_keyboard=[
-                        [InlineKeyboardButton(text="👤 View All Drivers", callback_data="list_drivers")],
+                        [
+                            InlineKeyboardButton(
+                                text="👤 View All Drivers", callback_data="list_drivers"
+                            )
+                        ],
                         [InlineKeyboardButton(text="🔙 Back", callback_data="manage_drivers")],
                     ]
                 ),
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             )
             return
 
@@ -690,21 +750,23 @@ class UnifiedManagementHandler:
             company_escaped = escape_markdown(company_name)
 
             text += f"• {driver_escaped} ({company_escaped})\n"
-            keyboard_buttons.append([
-                InlineKeyboardButton(
-                    text=f"👤 {driver.name} ({company_name})",
-                    callback_data=f"select_driver_for_chat_{driver.id}"
-                )
-            ])
+            keyboard_buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text=f"👤 {driver.name} ({company_name})",
+                        callback_data=f"select_driver_for_chat_{driver.id}",
+                    )
+                ]
+            )
 
-        keyboard_buttons.append([
-            InlineKeyboardButton(text="🔙 Back", callback_data="manage_drivers")
-        ])
+        keyboard_buttons.append(
+            [InlineKeyboardButton(text="🔙 Back", callback_data="manage_drivers")]
+        )
 
         await callback.message.edit_text(
             text,
             reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard_buttons),
-            parse_mode="Markdown"
+            parse_mode="Markdown",
         )
         await callback.answer()
 
@@ -715,9 +777,7 @@ class UnifiedManagementHandler:
         driver_id = int(callback.data.split("_")[4])
         driver = (
             await db.execute(
-                select(Driver)
-                .options(selectinload(Driver.company))
-                .where(Driver.id == driver_id)
+                select(Driver).options(selectinload(Driver.company)).where(Driver.id == driver_id)
             )
         ).scalar_one_or_none()
 
@@ -726,14 +786,16 @@ class UnifiedManagementHandler:
             return
 
         # Get unassigned chats
-        assigned_chat_ids_subq = (
-            select(Driver.chat_id).where(Driver.chat_id.isnot(None))
-        )
-        unassigned_chats = list((
-            await db.execute(
-                select(TelegramChat).where(~TelegramChat.id.in_(assigned_chat_ids_subq))
+        assigned_chat_ids_subq = select(Driver.chat_id).where(Driver.chat_id.isnot(None))
+        unassigned_chats = list(
+            (
+                await db.execute(
+                    select(TelegramChat).where(~TelegramChat.id.in_(assigned_chat_ids_subq))
+                )
             )
-        ).scalars().all())
+            .scalars()
+            .all()
+        )
 
         if not unassigned_chats:
             await callback.message.edit_text(
@@ -743,10 +805,14 @@ class UnifiedManagementHandler:
                 reply_markup=InlineKeyboardMarkup(
                     inline_keyboard=[
                         [InlineKeyboardButton(text="➕ Add New Chat", callback_data="add_group")],
-                        [InlineKeyboardButton(text="🔙 Back", callback_data="assign_driver_to_chat")],
+                        [
+                            InlineKeyboardButton(
+                                text="🔙 Back", callback_data="assign_driver_to_chat"
+                            )
+                        ],
                     ]
                 ),
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             )
             return
 
@@ -763,21 +829,23 @@ class UnifiedManagementHandler:
         for chat in unassigned_chats[:10]:  # Limit to 10
             chat_name_escaped = escape_markdown(chat.group_name)
             text += f"• {chat_name_escaped} (`{chat.chat_token}`)\n"
-            keyboard_buttons.append([
-                InlineKeyboardButton(
-                    text=f"💬 {chat.group_name}",
-                    callback_data=f"confirm_assign_chat_{driver.id}_{chat.id}"
-                )
-            ])
+            keyboard_buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text=f"💬 {chat.group_name}",
+                        callback_data=f"confirm_assign_chat_{driver.id}_{chat.id}",
+                    )
+                ]
+            )
 
-        keyboard_buttons.append([
-            InlineKeyboardButton(text="🔙 Back", callback_data="assign_driver_to_chat")
-        ])
+        keyboard_buttons.append(
+            [InlineKeyboardButton(text="🔙 Back", callback_data="assign_driver_to_chat")]
+        )
 
         await callback.message.edit_text(
             text,
             reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard_buttons),
-            parse_mode="Markdown"
+            parse_mode="Markdown",
         )
         await callback.answer()
 
@@ -798,9 +866,7 @@ class UnifiedManagementHandler:
                 )
             ).scalar_one_or_none()
             chat = (
-                await db.execute(
-                    select(TelegramChat).where(TelegramChat.id == chat_id)
-                )
+                await db.execute(select(TelegramChat).where(TelegramChat.id == chat_id))
             ).scalar_one_or_none()
 
             if not driver or not chat:
@@ -809,12 +875,12 @@ class UnifiedManagementHandler:
 
             # Check if chat is already assigned
             existing_assignment = (
-                await db.execute(
-                    select(Driver).where(Driver.chat_id == chat_id)
-                )
+                await db.execute(select(Driver).where(Driver.chat_id == chat_id))
             ).scalar_one_or_none()
             if existing_assignment:
-                await callback.answer("Chat is already assigned to another driver!", show_alert=True)
+                await callback.answer(
+                    "Chat is already assigned to another driver!", show_alert=True
+                )
                 return
 
             # Assign chat to driver
@@ -835,12 +901,20 @@ class UnifiedManagementHandler:
                 f"🎉 Driver can now receive notifications!",
                 reply_markup=InlineKeyboardMarkup(
                     inline_keyboard=[
-                        [InlineKeyboardButton(text="🔗 Assign Another", callback_data="assign_driver_to_chat")],
-                        [InlineKeyboardButton(text="👤 View All Drivers", callback_data="list_drivers")],
+                        [
+                            InlineKeyboardButton(
+                                text="🔗 Assign Another", callback_data="assign_driver_to_chat"
+                            )
+                        ],
+                        [
+                            InlineKeyboardButton(
+                                text="👤 View All Drivers", callback_data="list_drivers"
+                            )
+                        ],
                         [InlineKeyboardButton(text="🔙 Back", callback_data="manage_drivers")],
                     ]
                 ),
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             )
 
         except SQLAlchemyError as e:
@@ -856,13 +930,17 @@ class UnifiedManagementHandler:
     @safe_callback_handler
     async def handle_list_drivers(callback: CallbackQuery, db: AsyncSession):
         """List all drivers with their chat assignments"""
-        drivers = list((
-            await db.execute(
-                select(Driver)
-                .options(selectinload(Driver.company))
-                .join(Company, Driver.company_id == Company.id, isouter=True)
+        drivers = list(
+            (
+                await db.execute(
+                    select(Driver)
+                    .options(selectinload(Driver.company))
+                    .join(Company, Driver.company_id == Company.id, isouter=True)
+                )
             )
-        ).scalars().all())
+            .scalars()
+            .all()
+        )
 
         if not drivers:
             await callback.message.edit_text(
@@ -873,7 +951,7 @@ class UnifiedManagementHandler:
                         [InlineKeyboardButton(text="🔙 Back", callback_data="manage_drivers")],
                     ]
                 ),
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             )
             return
 
@@ -902,11 +980,15 @@ class UnifiedManagementHandler:
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
                     [InlineKeyboardButton(text="➕ Add Driver", callback_data="add_driver")],
-                    [InlineKeyboardButton(text="🔗 Assign Chats", callback_data="assign_driver_to_chat")],
+                    [
+                        InlineKeyboardButton(
+                            text="🔗 Assign Chats", callback_data="assign_driver_to_chat"
+                        )
+                    ],
                     [InlineKeyboardButton(text="🔙 Back", callback_data="manage_drivers")],
                 ]
             ),
-            parse_mode="Markdown"
+            parse_mode="Markdown",
         )
         await callback.answer()
 
@@ -929,7 +1011,7 @@ class UnifiedManagementHandler:
                         [InlineKeyboardButton(text="🔙 Back", callback_data="manage_groups")],
                     ]
                 ),
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             )
             return
 
@@ -938,9 +1020,7 @@ class UnifiedManagementHandler:
         for i, chat in enumerate(chats, 1):
             # Find driver assigned to this chat
             assigned_driver = (
-                await db.execute(
-                    select(Driver).where(Driver.chat_id == chat.id)
-                )
+                await db.execute(select(Driver).where(Driver.chat_id == chat.id))
             ).scalar_one_or_none()
 
             chat_name_escaped = escape_markdown(chat.group_name)
@@ -956,7 +1036,11 @@ class UnifiedManagementHandler:
 
         keyboard_buttons = [
             [InlineKeyboardButton(text="➕ Add Chat", callback_data="add_group")],
-            [InlineKeyboardButton(text="🔗 Assign to Drivers", callback_data="assign_driver_to_chat")],
+            [
+                InlineKeyboardButton(
+                    text="🔗 Assign to Drivers", callback_data="assign_driver_to_chat"
+                )
+            ],
             [InlineKeyboardButton(text="🔙 Back", callback_data="manage_groups")],
         ]
 

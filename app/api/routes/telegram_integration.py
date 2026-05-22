@@ -34,15 +34,11 @@ class DriverChatLinkResponse(BaseModel):
 
 
 @router.post("/link-driver", dependencies=[Depends(require_any_authenticated)])
-async def link_driver_to_chat(
-    request: LinkDriverToChatRequest, db: AsyncSession = Depends(get_db)
-):
+async def link_driver_to_chat(request: LinkDriverToChatRequest, db: AsyncSession = Depends(get_db)):
     """Link a driver to a Telegram chat"""
     try:
         # Check if driver exists
-        driver_result = await db.execute(
-            select(Driver).where(Driver.id == request.driver_id)
-        )
+        driver_result = await db.execute(select(Driver).where(Driver.id == request.driver_id))
         driver = driver_result.scalar_one_or_none()
         if not driver:
             raise HTTPException(status_code=404, detail="Driver not found")
@@ -71,14 +67,10 @@ async def link_driver_to_chat(
 
 
 @router.post("/unlink-driver", dependencies=[Depends(require_any_authenticated)])
-async def unlink_driver_from_chat(
-    request: UnlinkDriverRequest, db: AsyncSession = Depends(get_db)
-):
+async def unlink_driver_from_chat(request: UnlinkDriverRequest, db: AsyncSession = Depends(get_db)):
     """Unlink a driver from Telegram chat"""
     try:
-        result = await db.execute(
-            select(Driver).where(Driver.id == request.driver_id)
-        )
+        result = await db.execute(select(Driver).where(Driver.id == request.driver_id))
         driver = result.scalar_one_or_none()
         if not driver:
             raise HTTPException(status_code=404, detail="Driver not found")
@@ -135,9 +127,7 @@ async def get_available_drivers(db: AsyncSession = Depends(get_db)):
         ]
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error retrieving available drivers: {e!s}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error retrieving available drivers: {e!s}")
 
 
 @router.get("/available-chats")
@@ -211,9 +201,7 @@ async def send_test_message(
             }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error sending test message: {e!s}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error sending test message: {e!s}")
 
 
 @router.get("/chat-info/{chat_token}")
@@ -241,9 +229,7 @@ async def get_chat_info(chat_token: int, db: AsyncSession = Depends(get_db)):
             await bot.session.close()
 
             # Get linked drivers
-            linked_result = await db.execute(
-                select(Driver).where(Driver.chat_id == chat.id)
-            )
+            linked_result = await db.execute(select(Driver).where(Driver.chat_id == chat.id))
             linked_drivers = list(linked_result.scalars().all())
 
             return {
@@ -273,16 +259,12 @@ async def get_chat_info(chat_token: int, db: AsyncSession = Depends(get_db)):
                     "chat_token": chat.chat_token,
                     "company_id": chat.company_id,
                 },
-                "telegram_info": {
-                    "error": f"Could not fetch live info: {telegram_error!s}"
-                },
+                "telegram_info": {"error": f"Could not fetch live info: {telegram_error!s}"},
                 "linked_drivers": [],
             }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error getting chat info: {e!s}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error getting chat info: {e!s}")
 
 
 @router.delete("/chat/{chat_token}", dependencies=[Depends(require_role("admin"))])
@@ -297,9 +279,7 @@ async def remove_telegram_chat(chat_token: int, db: AsyncSession = Depends(get_d
             raise HTTPException(status_code=404, detail="Chat not found")
 
         # Unlink any drivers first
-        drivers_result = await db.execute(
-            select(Driver).where(Driver.chat_id == chat.id)
-        )
+        drivers_result = await db.execute(select(Driver).where(Driver.chat_id == chat.id))
         drivers = list(drivers_result.scalars().all())
         for driver in drivers:
             driver.chat_id = None

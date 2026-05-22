@@ -37,9 +37,7 @@ class ChatService:
 
             # Get default company if none specified
             if not company_id:
-                company = (
-                    await self.db.execute(select(Company))
-                ).scalars().first()
+                company = (await self.db.execute(select(Company))).scalars().first()
                 company_id = company.id if company else None
 
             new_chat = TelegramChat(

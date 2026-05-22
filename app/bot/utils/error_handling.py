@@ -49,9 +49,7 @@ def safe_callback_handler(func: Callable) -> Callable:
                     )
                     await callback.answer("Error occurred!", show_alert=True)
                 except Exception:
-                    logger.debug(
-                        "Failed to send error fallback message", exc_info=True
-                    )
+                    logger.debug("Failed to send error fallback message", exc_info=True)
 
             return None
 
@@ -82,9 +80,7 @@ def safe_message_handler(func: Callable) -> Callable:
                         "Please try again or use /start to return to the main menu."
                     )
                 except Exception:
-                    logger.debug(
-                        "Failed to send error fallback message", exc_info=True
-                    )
+                    logger.debug("Failed to send error fallback message", exc_info=True)
 
             return None
 
@@ -114,15 +110,11 @@ class CallbackDataValidator:
             parts = callback_data.split("_")
 
             if len(parts) < expected_parts:
-                logger.warning(
-                    "Callback data has insufficient parts: %s", callback_data
-                )
+                logger.warning("Callback data has insufficient parts: %s", callback_data)
                 return False, []
 
             if expected_prefix and not callback_data.startswith(expected_prefix):
-                logger.warning(
-                    "Callback data has wrong prefix: %s", callback_data
-                )
+                logger.warning("Callback data has wrong prefix: %s", callback_data)
                 return False, []
 
             # Validate that numeric parts are actually numeric. We don't fail
@@ -138,9 +130,7 @@ class CallbackDataValidator:
             return True, parts
 
         except Exception:
-            logger.exception(
-                "Error validating callback data '%s'", callback_data
-            )
+            logger.exception("Error validating callback data '%s'", callback_data)
             return False, []
 
     @staticmethod
@@ -149,17 +139,13 @@ class CallbackDataValidator:
         try:
             return int(value)
         except (ValueError, TypeError):
-            logger.warning(
-                "Failed to convert '%s' to int, using default %d", value, default
-            )
+            logger.warning("Failed to convert '%s' to int, using default %d", value, default)
             return default
 
     @staticmethod
     def extract_load_id(callback_data: str) -> int:
         """Extract load ID from callback data safely."""
-        is_valid, parts = CallbackDataValidator.validate_callback_data(
-            callback_data, 3
-        )
+        is_valid, parts = CallbackDataValidator.validate_callback_data(callback_data, 3)
         if is_valid and len(parts) >= 3:
             return CallbackDataValidator.safe_int_conversion(parts[2])
         return 0
@@ -167,9 +153,7 @@ class CallbackDataValidator:
     @staticmethod
     def extract_driver_id(callback_data: str) -> int:
         """Extract driver ID from callback data safely."""
-        is_valid, parts = CallbackDataValidator.validate_callback_data(
-            callback_data, 4
-        )
+        is_valid, parts = CallbackDataValidator.validate_callback_data(callback_data, 4)
         if is_valid and len(parts) >= 4:
             return CallbackDataValidator.safe_int_conversion(parts[3])
         return 0
@@ -177,9 +161,7 @@ class CallbackDataValidator:
     @staticmethod
     def extract_company_id(callback_data: str) -> int:
         """Extract company ID from callback data safely."""
-        is_valid, parts = CallbackDataValidator.validate_callback_data(
-            callback_data, 3
-        )
+        is_valid, parts = CallbackDataValidator.validate_callback_data(callback_data, 3)
         if is_valid and len(parts) >= 3:
             return CallbackDataValidator.safe_int_conversion(parts[2])
         return 0
@@ -238,12 +220,8 @@ class UserPermissionChecker:
                 user_data = kwargs.get("user_data")
 
                 if not user_data:
-                    logger.warning(
-                        "No user data provided for %s", func.__name__
-                    )
-                    return await UserPermissionChecker._handle_access_denied(
-                        *args, **kwargs
-                    )
+                    logger.warning("No user data provided for %s", func.__name__)
+                    return await UserPermissionChecker._handle_access_denied(*args, **kwargs)
 
                 if user_data.get("role") != required_role:
                     logger.warning(
@@ -252,9 +230,7 @@ class UserPermissionChecker:
                         func.__name__,
                         required_role,
                     )
-                    return await UserPermissionChecker._handle_access_denied(
-                        *args, **kwargs
-                    )
+                    return await UserPermissionChecker._handle_access_denied(*args, **kwargs)
 
                 return await func(*args, **kwargs)
 
@@ -276,9 +252,7 @@ class UserPermissionChecker:
                 await callback.answer("Access denied!", show_alert=True)
                 return
             except Exception:
-                logger.debug(
-                    "Failed to send access-denied callback", exc_info=True
-                )
+                logger.debug("Failed to send access-denied callback", exc_info=True)
 
         message = None
         for arg in args:
@@ -288,14 +262,10 @@ class UserPermissionChecker:
 
         if message:
             try:
-                await message.answer(
-                    "❌ Access denied! You don't have permission for this action."
-                )
+                await message.answer("❌ Access denied! You don't have permission for this action.")
                 return
             except Exception:
-                logger.debug(
-                    "Failed to send access-denied message", exc_info=True
-                )
+                logger.debug("Failed to send access-denied message", exc_info=True)
 
 
 # ---------- Helpers ----------

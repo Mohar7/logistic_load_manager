@@ -11,9 +11,7 @@ class AuthHandler:
     """Handler for authentication-related commands"""
 
     @staticmethod
-    async def handle_registration_status(
-        message: types.Message, db: AsyncSession, user_data: dict
-    ):
+    async def handle_registration_status(message: types.Message, db: AsyncSession, user_data: dict):
         """Check registration status"""
         if user_data:
             await message.answer(

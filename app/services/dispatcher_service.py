@@ -21,9 +21,7 @@ class DispatcherService:
         self.dispatcher_repo = DispatcherRepository(db)
         self.load_repo = LoadRepository(db)
 
-    async def add_dispatcher(
-        self, dispatcher_data: AddDispatcher
-    ) -> DispatcherResponse:
+    async def add_dispatcher(self, dispatcher_data: AddDispatcher) -> DispatcherResponse:
         """
         Adds a new dispatcher to the database.
 
@@ -52,10 +50,8 @@ class DispatcherService:
             )
 
             # Fetch created dispatcher
-            created_dispatcher = (
-                await self.dispatcher_repo.get_dispatcher_by_telegram_id(
-                    dispatcher_data.telegram_id
-                )
+            created_dispatcher = await self.dispatcher_repo.get_dispatcher_by_telegram_id(
+                dispatcher_data.telegram_id
             )
             logger.info(f"Dispatcher '{dispatcher_data.name}' added successfully.")
             return DispatcherResponse.model_validate(created_dispatcher)
@@ -70,9 +66,7 @@ class DispatcherService:
             logger.error(f"Unexpected error in add_dispatcher: {e!s}")
             raise
 
-    async def get_dispatcher_by_id(
-        self, dispatcher_id: int
-    ) -> DispatcherResponse | None:
+    async def get_dispatcher_by_id(self, dispatcher_id: int) -> DispatcherResponse | None:
         """
         Retrieve a dispatcher by ID.
 
@@ -85,9 +79,7 @@ class DispatcherService:
         dispatcher = await self.dispatcher_repo.get_dispatcher_by_id(dispatcher_id)
         return DispatcherResponse.model_validate(dispatcher) if dispatcher else None
 
-    async def get_dispatcher_by_telegram_id(
-        self, telegram_id: int
-    ) -> DispatcherResponse | None:
+    async def get_dispatcher_by_telegram_id(self, telegram_id: int) -> DispatcherResponse | None:
         """
         Retrieve a dispatcher by Telegram ID.
 
@@ -97,14 +89,10 @@ class DispatcherService:
         Returns:
             Optional[DispatcherResponse]: Dispatcher data or None if not found.
         """
-        dispatcher = await self.dispatcher_repo.get_dispatcher_by_telegram_id(
-            telegram_id
-        )
+        dispatcher = await self.dispatcher_repo.get_dispatcher_by_telegram_id(telegram_id)
         return DispatcherResponse.model_validate(dispatcher) if dispatcher else None
 
-    async def get_dispatchers(
-        self, skip: int = 0, limit: int = 100
-    ) -> list[DispatcherResponse]:
+    async def get_dispatchers(self, skip: int = 0, limit: int = 100) -> list[DispatcherResponse]:
         """
         Get a list of dispatchers.
 
@@ -175,9 +163,7 @@ class DispatcherService:
             logger.warning(msg)
             raise ValueError(msg)
 
-        deleted = await self.dispatcher_repo.delete_dispatcher(
-            dispatcher_id=dispatcher_id
-        )
+        deleted = await self.dispatcher_repo.delete_dispatcher(dispatcher_id=dispatcher_id)
         if deleted:
             logger.info(f"Dispatcher {dispatcher_id} was successfully deleted.")
         else:

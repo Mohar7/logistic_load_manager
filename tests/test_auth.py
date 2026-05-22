@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pytest
-from freezegun import freeze_time
 from httpx import AsyncClient
 
-from app.auth.security import create_access_token, hash_password
+from app.auth.security import create_access_token
 from app.db.models import User
-
 
 # ---------- /auth/login ----------
 
@@ -41,9 +39,7 @@ async def test_login_rejects_unknown_user(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_login_rejects_wrong_password(
-    client: AsyncClient, dispatcher_user: User
-) -> None:
+async def test_login_rejects_wrong_password(client: AsyncClient, dispatcher_user: User) -> None:
     response = await client.post(
         "/auth/login",
         data={"username": "dispatcher", "password": "WRONG"},
@@ -87,9 +83,7 @@ async def test_me_rejects_missing_token(client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_me_rejects_garbage_token(client: AsyncClient) -> None:
-    response = await client.get(
-        "/auth/me", headers={"Authorization": "Bearer not-a-valid-jwt"}
-    )
+    response = await client.get("/auth/me", headers={"Authorization": "Bearer not-a-valid-jwt"})
     assert response.status_code == 401
 
 
@@ -101,9 +95,7 @@ async def test_me_rejects_expired_token(client: AsyncClient, dispatcher_user) ->
         role="dispatcher",
         expires_delta=timedelta(seconds=-1),
     )
-    response = await client.get(
-        "/auth/me", headers={"Authorization": f"Bearer {expired}"}
-    )
+    response = await client.get("/auth/me", headers={"Authorization": f"Bearer {expired}"})
     assert response.status_code == 401
 
 

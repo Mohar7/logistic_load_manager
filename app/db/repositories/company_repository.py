@@ -35,9 +35,7 @@ class CompanyRepository:
             Company: Created company instance
         """
         try:
-            company = Company(
-                name=name, usdot=usdot, carrier_identifier=carrier_identifier, mc=mc
-            )
+            company = Company(name=name, usdot=usdot, carrier_identifier=carrier_identifier, mc=mc)
 
             self.db.add(company)
             await self.db.commit()
@@ -125,9 +123,7 @@ class CompanyRepository:
             Optional[Company]: Updated company if found, None otherwise
         """
         try:
-            result = await self.db.execute(
-                select(Company).where(Company.id == company_id)
-            )
+            result = await self.db.execute(select(Company).where(Company.id == company_id))
             company = result.scalar_one_or_none()
             if not company:
                 return None
@@ -165,9 +161,7 @@ class CompanyRepository:
             bool: True if the company was deleted, False otherwise
         """
         try:
-            result = await self.db.execute(
-                select(Company).where(Company.id == company_id)
-            )
+            result = await self.db.execute(select(Company).where(Company.id == company_id))
             company = result.scalar_one_or_none()
             if not company:
                 return False

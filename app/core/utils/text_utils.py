@@ -39,7 +39,7 @@ def find_all(pattern: str, text: str, group: int = 0) -> list[str]:
     return re.findall(pattern, text)
 
 
-def parse_decimal(value: str | None, replacements: dict = None) -> Decimal | None:
+def parse_decimal(value: str | None, replacements: dict | None = None) -> Decimal | None:
     """
     Helper method to parse Decimal values.
 

@@ -70,9 +70,7 @@ class CompanyService:
 
         return {"company": company, "drivers_count": len(drivers)}
 
-    async def get_companies(
-        self, skip: int = 0, limit: int = 100
-    ) -> list[dict[str, Any]]:
+    async def get_companies(self, skip: int = 0, limit: int = 100) -> list[dict[str, Any]]:
         """
         Get all companies with pagination.
 
@@ -116,9 +114,7 @@ class CompanyService:
         try:
             # Check if USDOT is already used by another company
             if usdot is not None:
-                existing_company = await self.company_repository.get_company_by_usdot(
-                    usdot
-                )
+                existing_company = await self.company_repository.get_company_by_usdot(usdot)
                 if existing_company and existing_company.id != company_id:
                     raise ValueError(f"Company with USDOT {usdot} already exists")
 

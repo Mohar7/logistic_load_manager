@@ -19,9 +19,7 @@ class DriverRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create_driver(
-        self, name: str, company_id: int, chat_id: int | None = None
-    ) -> Driver:
+    async def create_driver(self, name: str, company_id: int, chat_id: int | None = None) -> Driver:
         """
         Create a new driver.
 
@@ -35,9 +33,7 @@ class DriverRepository:
         """
         try:
             # Ensure company exists
-            result = await self.db.execute(
-                select(Company).where(Company.id == company_id)
-            )
+            result = await self.db.execute(select(Company).where(Company.id == company_id))
             company = result.scalar_one_or_none()
             if not company:
                 raise ValueError(f"Company with ID {company_id} does not exist")
@@ -53,15 +49,11 @@ class DriverRepository:
 
             # Generate a new driver ID (in a real system, this might follow a specific pattern)
             # For this example, we'll use a simple incremental ID
-            result = await self.db.execute(
-                select(Driver).order_by(Driver.id.desc()).limit(1)
-            )
+            result = await self.db.execute(select(Driver).order_by(Driver.id.desc()).limit(1))
             last_driver = result.scalar_one_or_none()
             new_id = (last_driver.id + 1) if last_driver else 1
 
-            driver = Driver(
-                id=new_id, name=name, company_id=company_id, chat_id=chat_id
-            )
+            driver = Driver(id=new_id, name=name, company_id=company_id, chat_id=chat_id)
 
             self.db.add(driver)
             await self.db.commit()
@@ -110,9 +102,7 @@ class DriverRepository:
         Returns:
             List[Driver]: List of drivers for the company
         """
-        result = await self.db.execute(
-            select(Driver).where(Driver.company_id == company_id)
-        )
+        result = await self.db.execute(select(Driver).where(Driver.company_id == company_id))
         return list(result.scalars().all())
 
     async def get_drivers(self, skip: int = 0, limit: int = 100) -> list[Driver]:
@@ -149,9 +139,7 @@ class DriverRepository:
             Optional[Driver]: Updated driver if found, None otherwise
         """
         try:
-            result = await self.db.execute(
-                select(Driver).where(Driver.id == driver_id)
-            )
+            result = await self.db.execute(select(Driver).where(Driver.id == driver_id))
             driver = result.scalar_one_or_none()
             if not driver:
                 return None
@@ -161,9 +149,7 @@ class DriverRepository:
 
             if company_id is not None:
                 # Ensure company exists
-                result = await self.db.execute(
-                    select(Company).where(Company.id == company_id)
-                )
+                result = await self.db.execute(select(Company).where(Company.id == company_id))
                 company = result.scalar_one_or_none()
                 if not company:
                     raise ValueError(f"Company with ID {company_id} does not exist")
@@ -177,9 +163,7 @@ class DriverRepository:
                     )
                     chat = result.scalar_one_or_none()
                     if not chat:
-                        raise ValueError(
-                            f"Telegram chat with ID {chat_id} does not exist"
-                        )
+                        raise ValueError(f"Telegram chat with ID {chat_id} does not exist")
                 driver.chat_id = chat_id
 
             await self.db.commit()
@@ -203,9 +187,7 @@ class DriverRepository:
             bool: True if the driver was deleted, False otherwise
         """
         try:
-            result = await self.db.execute(
-                select(Driver).where(Driver.id == driver_id)
-            )
+            result = await self.db.execute(select(Driver).where(Driver.id == driver_id))
             driver = result.scalar_one_or_none()
             if not driver:
                 return False

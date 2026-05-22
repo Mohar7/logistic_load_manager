@@ -76,11 +76,7 @@ class CompleteGroupManagementHandler:
                                 text="✅ Add This Group", callback_data="confirm_add_group"
                             )
                         ],
-                        [
-                            InlineKeyboardButton(
-                                text="❌ Cancel", callback_data="cancel_add_group"
-                            )
-                        ],
+                        [InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_add_group")],
                     ]
                 )
 
@@ -97,7 +93,9 @@ class CompleteGroupManagementHandler:
                     f"Add this group to the system?"
                 )
 
-                await message.answer(confirmation_text, reply_markup=keyboard, parse_mode="Markdown")
+                await message.answer(
+                    confirmation_text, reply_markup=keyboard, parse_mode="Markdown"
+                )
 
             except Exception as e:
                 await bot_instance.session.close()
@@ -118,7 +116,7 @@ class CompleteGroupManagementHandler:
                     f"2. Make sure it's a public group\n"
                     f"3. Add the bot to the group first\n"
                     f"4. Try using chat ID method instead",
-                    parse_mode="Markdown"
+                    parse_mode="Markdown",
                 )
 
         except Exception as e:
@@ -172,11 +170,7 @@ class CompleteGroupManagementHandler:
                                 text="✅ Add This Group", callback_data="confirm_add_group"
                             )
                         ],
-                        [
-                            InlineKeyboardButton(
-                                text="❌ Cancel", callback_data="cancel_add_group"
-                            )
-                        ],
+                        [InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_add_group")],
                     ]
                 )
 
@@ -193,7 +187,9 @@ class CompleteGroupManagementHandler:
                     f"Add this group to the system?"
                 )
 
-                await message.answer(confirmation_text, reply_markup=keyboard, parse_mode="Markdown")
+                await message.answer(
+                    confirmation_text, reply_markup=keyboard, parse_mode="Markdown"
+                )
 
             except Exception as e:
                 await bot_instance.session.close()
@@ -201,10 +197,7 @@ class CompleteGroupManagementHandler:
 
                 if "chat not found" in error_msg.lower():
                     error_reason = "Chat ID doesn't exist or is invalid"
-                elif (
-                    "bot is not a member" in error_msg.lower()
-                    or "forbidden" in error_msg.lower()
-                ):
+                elif "bot is not a member" in error_msg.lower() or "forbidden" in error_msg.lower():
                     error_reason = "Bot is not added to the group or lacks permissions"
                 elif "bad request" in error_msg.lower():
                     error_reason = "Invalid chat ID format or access denied"
@@ -219,7 +212,7 @@ class CompleteGroupManagementHandler:
                     f"2. Give the bot admin permissions (or at least 'Read Messages')\n"
                     f"3. Try forwarding a message instead\n"
                     f"4. Double-check the chat ID is correct",
-                    parse_mode="Markdown"
+                    parse_mode="Markdown",
                 )
 
         except ValueError:
@@ -229,13 +222,11 @@ class CompleteGroupManagementHandler:
                 "*Examples:*\n"
                 "• `-1001234567890`\n"
                 "• `-123456789`",
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             )
         except Exception as e:
             logger.error(f"Error in chat ID input: {e}")
-            await message.answer(
-                "❌ An error occurred while checking chat ID. Please try again."
-            )
+            await message.answer("❌ An error occurred while checking chat ID. Please try again.")
 
     @staticmethod
     async def handle_forward_message(message: types.Message, state: FSMContext, db: AsyncSession):
@@ -251,9 +242,7 @@ class CompleteGroupManagementHandler:
         # Method 1: Standard forward_from_chat (works most of the time)
         if message.forward_from_chat:
             chat_info = message.forward_from_chat
-            logger.info(
-                f"Detected forwarded message via forward_from_chat: {chat_info.title}"
-            )
+            logger.info(f"Detected forwarded message via forward_from_chat: {chat_info.title}")
 
         # Method 2: Check if message has forward_date but no forward_from_chat (privacy protected)
         elif message.forward_date:
@@ -273,7 +262,7 @@ class CompleteGroupManagementHandler:
                 "*Option 3: Manual Input*\n"
                 "• Send me the chat ID directly as a number\n"
                 "• Example: `-1001234567890`",
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             )
             return
 
@@ -311,7 +300,7 @@ class CompleteGroupManagementHandler:
                 "4. Send that number to me here\n\n"
                 "*Method 3: Cancel and try different method*\n"
                 "Send /cancel and use 'Enter Chat ID' option",
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             )
             return
 
@@ -321,7 +310,7 @@ class CompleteGroupManagementHandler:
                 f"❌ *Not a group message*\n\n"
                 f"*Detected chat type:* {chat_info.type.title()}\n"
                 f"Please forward a message from a GROUP or SUPERGROUP.",
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             )
             return
 
@@ -337,11 +326,7 @@ class CompleteGroupManagementHandler:
         # Show confirmation
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="✅ Add This Group", callback_data="confirm_add_group"
-                    )
-                ],
+                [InlineKeyboardButton(text="✅ Add This Group", callback_data="confirm_add_group")],
                 [InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_add_group")],
             ]
         )
@@ -365,7 +350,9 @@ class CompleteGroupManagementHandler:
         await message.answer(confirmation_text, reply_markup=keyboard, parse_mode="Markdown")
 
     @staticmethod
-    async def handle_confirm_add_group(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
+    async def handle_confirm_add_group(
+        callback: CallbackQuery, state: FSMContext, db: AsyncSession
+    ):
         """Confirm and add the selected group"""
         try:
             state_data = await state.get_data()
@@ -378,10 +365,10 @@ class CompleteGroupManagementHandler:
             )
 
             if success:
-                group_name_escaped = escape_markdown(state_data['chat_title'])
+                group_name_escaped = escape_markdown(state_data["chat_title"])
                 username_text = ""
                 if state_data.get("chat_username"):
-                    username_escaped = escape_markdown(state_data['chat_username'])
+                    username_escaped = escape_markdown(state_data["chat_username"])
                     username_text = f"\n*Username:* {username_escaped}"
 
                 await callback.message.edit_text(
@@ -415,7 +402,7 @@ class CompleteGroupManagementHandler:
                     parse_mode="Markdown",
                 )
             else:
-                group_name_escaped = escape_markdown(state_data['chat_title'])
+                group_name_escaped = escape_markdown(state_data["chat_title"])
                 await callback.message.edit_text(
                     f"❌ *Failed to Add Group*\n\n"
                     f"*Reason:* Group may already exist in the system.\n\n"
@@ -429,11 +416,7 @@ class CompleteGroupManagementHandler:
                                     callback_data="list_groups",
                                 )
                             ],
-                            [
-                                InlineKeyboardButton(
-                                    text="🔙 Back", callback_data="manage_groups"
-                                )
-                            ],
+                            [InlineKeyboardButton(text="🔙 Back", callback_data="manage_groups")],
                         ]
                     ),
                     parse_mode="Markdown",
@@ -442,18 +425,13 @@ class CompleteGroupManagementHandler:
         except Exception as e:
             logger.error(f"Error confirming group addition: {e}")
             await callback.message.edit_text(
-                "❌ *Error Adding Group*\n\n"
-                "An unexpected error occurred. Please try again.",
+                "❌ *Error Adding Group*\n\n" "An unexpected error occurred. Please try again.",
                 reply_markup=InlineKeyboardMarkup(
                     inline_keyboard=[
-                        [
-                            InlineKeyboardButton(
-                                text="🔙 Back", callback_data="manage_groups"
-                            )
-                        ]
+                        [InlineKeyboardButton(text="🔙 Back", callback_data="manage_groups")]
                     ]
                 ),
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             )
 
         await state.clear()
@@ -468,19 +446,11 @@ class CompleteGroupManagementHandler:
             "❌ *Group Addition Cancelled*\n\nNo changes were made to the system.",
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="➕ Try Again", callback_data="add_group"
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text="🔙 Back", callback_data="manage_groups"
-                        )
-                    ],
+                    [InlineKeyboardButton(text="➕ Try Again", callback_data="add_group")],
+                    [InlineKeyboardButton(text="🔙 Back", callback_data="manage_groups")],
                 ]
             ),
-            parse_mode="Markdown"
+            parse_mode="Markdown",
         )
         await callback.answer()
 

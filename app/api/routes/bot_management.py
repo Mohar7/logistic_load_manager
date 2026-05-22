@@ -61,9 +61,7 @@ class NotificationRequest(BaseModel):
     response_model=TelegramChatResponse,
     dependencies=[Depends(require_any_authenticated)],
 )
-async def create_telegram_chat(
-    chat_data: TelegramChatCreate, db: AsyncSession = Depends(get_db)
-):
+async def create_telegram_chat(chat_data: TelegramChatCreate, db: AsyncSession = Depends(get_db)):
     """Create a new Telegram chat entry"""
     chat_service = ChatService(db)
 
@@ -75,9 +73,7 @@ async def create_telegram_chat(
     )
 
     if not success:
-        raise HTTPException(
-            status_code=400, detail="Chat already exists or creation failed"
-        )
+        raise HTTPException(status_code=400, detail="Chat already exists or creation failed")
 
     # Fetch the created chat
     chat = await chat_service.get_chat_by_id(chat_data.chat_token)
@@ -147,9 +143,7 @@ async def get_bot_users(db: AsyncSession = Depends(get_db)):
 async def get_pending_managers(db: AsyncSession = Depends(get_db)):
     """Get all managers (for approval workflow)"""
     try:
-        result = await db.execute(
-            select(Dispatchers).where(Dispatchers.role == "manager")
-        )
+        result = await db.execute(select(Dispatchers).where(Dispatchers.role == "manager"))
         managers = list(result.scalars().all())
 
         return [
@@ -162,18 +156,14 @@ async def get_pending_managers(db: AsyncSession = Depends(get_db)):
             for manager in managers
         ]
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error retrieving managers: {e!s}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error retrieving managers: {e!s}")
 
 
 @router.get("/users/dispatchers")
 async def get_dispatchers(db: AsyncSession = Depends(get_db)):
     """Get all dispatchers"""
     try:
-        result = await db.execute(
-            select(Dispatchers).where(Dispatchers.role == "dispatcher")
-        )
+        result = await db.execute(select(Dispatchers).where(Dispatchers.role == "dispatcher"))
         dispatchers = list(result.scalars().all())
 
         return [
@@ -186,9 +176,7 @@ async def get_dispatchers(db: AsyncSession = Depends(get_db)):
             for dispatcher in dispatchers
         ]
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error retrieving dispatchers: {e!s}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error retrieving dispatchers: {e!s}")
 
 
 @router.post(
@@ -198,9 +186,7 @@ async def get_dispatchers(db: AsyncSession = Depends(get_db)):
 async def approve_user(user_id: int, db: AsyncSession = Depends(get_db)):
     """Approve a pending user registration"""
     try:
-        result = await db.execute(
-            select(Dispatchers).where(Dispatchers.id == user_id)
-        )
+        result = await db.execute(select(Dispatchers).where(Dispatchers.id == user_id))
         user = result.scalar_one_or_none()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -217,9 +203,7 @@ async def approve_user(user_id: int, db: AsyncSession = Depends(get_db)):
 async def delete_bot_user(user_id: int, db: AsyncSession = Depends(get_db)):
     """Delete a bot user"""
     try:
-        result = await db.execute(
-            select(Dispatchers).where(Dispatchers.id == user_id)
-        )
+        result = await db.execute(select(Dispatchers).where(Dispatchers.id == user_id))
         user = result.scalar_one_or_none()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -271,22 +255,16 @@ async def send_notification(
                         sent_count += 1
                     except Exception:
                         failed_count += 1
-                        logger.exception(
-                            "Failed to send to chat %s", chat.group_name
-                        )
+                        logger.exception("Failed to send to chat %s", chat.group_name)
 
             elif notification.target_type == "drivers":
                 # Send to all drivers
-                drivers_result = await db.execute(
-                    select(Driver).where(Driver.chat_id.isnot(None))
-                )
+                drivers_result = await db.execute(select(Driver).where(Driver.chat_id.isnot(None)))
                 drivers = list(drivers_result.scalars().all())
                 for driver in drivers:
                     try:
                         chat_result = await db.execute(
-                            select(TelegramChat).where(
-                                TelegramChat.id == driver.chat_id
-                            )
+                            select(TelegramChat).where(TelegramChat.id == driver.chat_id)
                         )
                         chat = chat_result.scalar_one_or_none()
                         if chat:
@@ -297,9 +275,7 @@ async def send_notification(
                             sent_count += 1
                     except Exception:
                         failed_count += 1
-                        logger.exception(
-                            "Failed to send to driver %s", driver.name
-                        )
+                        logger.exception("Failed to send to driver %s", driver.name)
 
             elif notification.target_type == "specific_chat" and notification.target_id:
                 # Send to specific chat
@@ -310,9 +286,7 @@ async def send_notification(
                     sent_count = 1
                 except Exception:
                     failed_count = 1
-                    logger.exception(
-                        "Failed to send to chat %s", notification.target_id
-                    )
+                    logger.exception("Failed to send to chat %s", notification.target_id)
 
             await bot.session.close()
             logger.info(
@@ -342,9 +316,7 @@ async def notify_load_assignment(
 
     async def notify_task():
         notification_service = NotificationService(db)
-        success = await notification_service.notify_driver_about_load(
-            load_id, driver_id
-        )
+        success = await notification_service.notify_driver_about_load(load_id, driver_id)
         logger.info("Load notification sent: %s", success)
 
     await notify_task()
@@ -367,33 +339,23 @@ async def get_bot_stats(db: AsyncSession = Depends(get_db)):
         total_dispatchers = (
             await db.execute(select(func.count()).select_from(Dispatchers))
         ).scalar_one()
-        total_drivers = (
-            await db.execute(select(func.count()).select_from(Driver))
-        ).scalar_one()
-        total_loads = (
-            await db.execute(select(func.count()).select_from(Load))
-        ).scalar_one()
+        total_drivers = (await db.execute(select(func.count()).select_from(Driver))).scalar_one()
+        total_loads = (await db.execute(select(func.count()).select_from(Load))).scalar_one()
 
         # Active assignments
         assigned_loads = (
             await db.execute(
-                select(func.count())
-                .select_from(Load)
-                .where(Load.driver_id.isnot(None))
+                select(func.count()).select_from(Load).where(Load.driver_id.isnot(None))
             )
         ).scalar_one()
         unassigned_loads = (
-            await db.execute(
-                select(func.count()).select_from(Load).where(Load.driver_id.is_(None))
-            )
+            await db.execute(select(func.count()).select_from(Load).where(Load.driver_id.is_(None)))
         ).scalar_one()
 
         # Drivers with telegram connections
         connected_drivers = (
             await db.execute(
-                select(func.count())
-                .select_from(Driver)
-                .where(Driver.chat_id.isnot(None))
+                select(func.count()).select_from(Driver).where(Driver.chat_id.isnot(None))
             )
         ).scalar_one()
 

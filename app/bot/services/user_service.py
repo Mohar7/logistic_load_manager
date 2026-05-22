@@ -38,9 +38,7 @@ class UserService:
             await self.db.commit()
             await self.db.refresh(user)
 
-            logger.info(
-                f"Created user registration: {name} ({role}) - Telegram ID: {telegram_id}"
-            )
+            logger.info(f"Created user registration: {name} ({role}) - Telegram ID: {telegram_id}")
             return True
 
         except SQLAlchemyError as e:
@@ -62,16 +60,12 @@ class UserService:
 
             if not dispatcher:
                 # Create new dispatcher - they can manage all companies
-                dispatcher = Dispatchers(
-                    name=name, telegram_id=telegram_id, role="dispatcher"
-                )
+                dispatcher = Dispatchers(name=name, telegram_id=telegram_id, role="dispatcher")
                 self.db.add(dispatcher)
                 await self.db.commit()
                 await self.db.refresh(dispatcher)
 
-            logger.info(
-                f"Completed dispatcher registration: {name} - Can manage all companies"
-            )
+            logger.info(f"Completed dispatcher registration: {name} - Can manage all companies")
             return True
 
         except SQLAlchemyError as e:
@@ -113,9 +107,7 @@ class UserService:
             logger.error(f"Error getting companies: {e}")
             return []
 
-    async def get_user_by_telegram_id(
-        self, telegram_id: int
-    ) -> dict[str, Any] | None:
+    async def get_user_by_telegram_id(self, telegram_id: int) -> dict[str, Any] | None:
         """Get user information by Telegram ID"""
         try:
             # Check for user in Dispatchers table (now handles both dispatchers and managers)
@@ -130,8 +122,7 @@ class UserService:
                     "id": user.id,
                     "name": user.name,
                     "telegram_id": user.telegram_id,
-                    "role": user.role
-                    or "dispatcher",  # Default to dispatcher if role is None
+                    "role": user.role or "dispatcher",  # Default to dispatcher if role is None
                 }
 
             return None
@@ -165,9 +156,7 @@ class UserService:
         try:
             # You could add a status column and filter by status='pending'
             # For now, we'll just return all managers
-            result = await self.db.execute(
-                select(Dispatchers).where(Dispatchers.role == "manager")
-            )
+            result = await self.db.execute(select(Dispatchers).where(Dispatchers.role == "manager"))
             managers = list(result.scalars().all())
 
             return [
@@ -188,9 +177,7 @@ class UserService:
         """Delete a user"""
         try:
             user = (
-                await self.db.execute(
-                    select(Dispatchers).where(Dispatchers.id == user_id)
-                )
+                await self.db.execute(select(Dispatchers).where(Dispatchers.id == user_id))
             ).scalar_one_or_none()
             if not user:
                 return False
@@ -236,9 +223,7 @@ class UserService:
         """Notify administrators about new registration"""
         try:
             # Get all existing managers to notify them
-            result = await self.db.execute(
-                select(Dispatchers).where(Dispatchers.role == "manager")
-            )
+            result = await self.db.execute(select(Dispatchers).where(Dispatchers.role == "manager"))
             managers = list(result.scalars().all())
 
             if managers:
@@ -264,9 +249,7 @@ class UserService:
                             text=notification_message,
                             parse_mode="Markdown",
                         )
-                        logger.info(
-                            f"Notified manager {manager.name} about new registration"
-                        )
+                        logger.info(f"Notified manager {manager.name} about new registration")
                     except Exception as e:
                         logger.error(f"Failed to notify manager {manager.name}: {e}")
 
@@ -281,9 +264,7 @@ async def migrate_existing_users(db: AsyncSession):
     """Migrate existing users to have proper roles"""
     try:
         # Update users without roles to be dispatchers
-        result = await db.execute(
-            select(Dispatchers).where(Dispatchers.role.is_(None))
-        )
+        result = await db.execute(select(Dispatchers).where(Dispatchers.role.is_(None)))
         users_without_roles = list(result.scalars().all())
 
         for user in users_without_roles:
@@ -291,9 +272,7 @@ async def migrate_existing_users(db: AsyncSession):
             logger.info(f"Updated {user.name} to dispatcher role")
 
         await db.commit()
-        logger.info(
-            f"Migrated {len(users_without_roles)} users to have dispatcher role"
-        )
+        logger.info(f"Migrated {len(users_without_roles)} users to have dispatcher role")
 
     except Exception as e:
         logger.error(f"Error migrating users: {e}")

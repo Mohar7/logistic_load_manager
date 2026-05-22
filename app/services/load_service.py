@@ -26,9 +26,7 @@ class LoadService:
     ) -> dict[str, Any]:
         try:
             # Parse the load text
-            parsing_service = ParsingService(
-                text=load_text, dispatcher_id=dispatcher_id
-            )
+            parsing_service = ParsingService(text=load_text, dispatcher_id=dispatcher_id)
             logger.info(
                 f"Parsing load text for dispatcher {dispatcher_id} with length {len(load_text)}"
             )
@@ -36,9 +34,7 @@ class LoadService:
 
             # Check if parsing was successful
             if not parsed_data or "tripInfo" not in parsed_data:
-                raise ValueError(
-                    "Failed to parse load text or no trip information found"
-                )
+                raise ValueError("Failed to parse load text or no trip information found")
 
             # Check if load with this trip_id already exists
             existing_load = await self.load_repository.get_load_by_trip_id(
@@ -67,9 +63,7 @@ class LoadService:
             logger.error(f"Error in parse_and_save_load: {e!s}")
             raise
 
-    async def update_load(
-        self, load_id: int, update_data: dict[str, Any]
-    ) -> dict[str, Any] | None:
+    async def update_load(self, load_id: int, update_data: dict[str, Any]) -> dict[str, Any] | None:
         """
         Update an existing load with provided data.
 
@@ -122,23 +116,17 @@ class LoadService:
                 return None
 
             # Parse the new load text
-            parsing_service = ParsingService(
-                text=load_text, dispatcher_id=dispatcher_id
-            )
+            parsing_service = ParsingService(text=load_text, dispatcher_id=dispatcher_id)
             parsed_data = parsing_service.parse()
 
             if not parsed_data or "tripInfo" not in parsed_data:
-                raise ValueError(
-                    "Failed to parse load text or no trip information found"
-                )
+                raise ValueError("Failed to parse load text or no trip information found")
 
             # Delete existing legs
             await self.load_repository.delete_legs_for_load(load_id)
 
             # Update the load with parsed trip info
-            updated_load = await self.load_repository.update_load(
-                load_id, parsed_data["tripInfo"]
-            )
+            updated_load = await self.load_repository.update_load(load_id, parsed_data["tripInfo"])
 
             # Create new legs
             legs = []
@@ -205,9 +193,7 @@ class LoadService:
 
         return {"load": load, "legs": legs}
 
-    async def get_all_loads(
-        self, skip: int = 0, limit: int = 100
-    ) -> list[dict[str, Any]]:
+    async def get_all_loads(self, skip: int = 0, limit: int = 100) -> list[dict[str, Any]]:
         loads = await self.load_repository.get_loads(skip, limit)
         result = []
 
@@ -217,9 +203,7 @@ class LoadService:
 
         return result
 
-    async def update_dispatcher_for_load(
-        self, load_id: int, dispatcher_id: int
-    ) -> None:
+    async def update_dispatcher_for_load(self, load_id: int, dispatcher_id: int) -> None:
         try:
             await self.load_repository.update_dispatcher_for_the_load(
                 load_id=load_id, dispatcher_id=dispatcher_id

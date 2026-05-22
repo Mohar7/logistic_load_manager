@@ -61,9 +61,7 @@ async def read_dispatcher(dispatcher_id: int, db: AsyncSession = Depends(get_db)
 
 
 @router.get("/telegram/{telegram_id}", response_model=DispatcherResponse)
-async def get_dispatcher_by_telegram(
-    telegram_id: int, db: AsyncSession = Depends(get_db)
-):
+async def get_dispatcher_by_telegram(telegram_id: int, db: AsyncSession = Depends(get_db)):
     service = DispatcherService(db)
     dispatcher = await service.get_dispatcher_by_telegram_id(telegram_id)
     if not dispatcher:
@@ -77,9 +75,7 @@ async def get_dispatcher_by_telegram(
 
 
 @router.get("/", response_model=list[DispatcherResponse])
-async def read_dispatchers(
-    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)
-):
+async def read_dispatchers(skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)):
     service = DispatcherService(db)
     return await service.get_dispatchers(skip=skip, limit=limit)
 

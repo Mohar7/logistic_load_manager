@@ -25,9 +25,7 @@ class NotificationService:
         self.load_repository = LoadRepository(db)
         self.base_url = "https://api.telegram.org/bot{token}/sendMessage"
 
-    async def notify_driver_about_load(
-        self, load_id: int, driver_id: int | None = None
-    ) -> bool:
+    async def notify_driver_about_load(self, load_id: int, driver_id: int | None = None) -> bool:
         """
         Notify a driver about a load assignment via Telegram.
         Now supports cross-company assignments.
@@ -49,9 +47,7 @@ class NotificationService:
             # Get the driver
             target_driver_id = driver_id if driver_id is not None else load.driver_id
             if not target_driver_id:
-                logger.error(
-                    f"No driver assigned to load {load_id} and no driver ID provided"
-                )
+                logger.error(f"No driver assigned to load {load_id} and no driver ID provided")
                 return False
 
             result = await self.db.execute(
@@ -66,9 +62,7 @@ class NotificationService:
 
             # Check if driver has a Telegram chat
             if not driver.chat_id:
-                logger.error(
-                    f"Driver {driver.name} does not have a Telegram chat assigned"
-                )
+                logger.error(f"Driver {driver.name} does not have a Telegram chat assigned")
                 return False
 
             result = await self.db.execute(
@@ -76,9 +70,7 @@ class NotificationService:
             )
             chat = result.scalar_one_or_none()
             if not chat or not chat.chat_token:
-                logger.error(
-                    f"Telegram chat for driver {driver.name} not found or has no token"
-                )
+                logger.error(f"Telegram chat for driver {driver.name} not found or has no token")
                 return False
 
             # Get legs for the load
@@ -109,9 +101,7 @@ class NotificationService:
         # Get company information for cross-company context
         driver_company = driver.company.name if driver.company else "No Company"
         load_company = load.company.name if load.company else "No Company"
-        is_cross_company = (
-            driver.company_id != load.company_id if load.company_id else False
-        )
+        is_cross_company = driver.company_id != load.company_id if load.company_id else False
 
         message = "🚚 **NEW LOAD ASSIGNMENT** 🚚\n\n"
         message += f"Hello **{driver.name}**,\n\n"
@@ -140,9 +130,7 @@ class NotificationService:
             message += f"\n**📦 Load Details ({len(legs)} legs):**\n"
             for i, leg in enumerate(legs, 1):
                 message += f"\n**Leg {i}:**\n"
-                message += (
-                    f"📍 {leg.pickup_facility_name} → {leg.dropoff_facility_name}\n"
-                )
+                message += f"📍 {leg.pickup_facility_name} → {leg.dropoff_facility_name}\n"
                 message += f"🕐 {leg.pickup_time_str} - {leg.dropoff_time_str}\n"
                 message += f"📏 {float(leg.distance):,.1f} mi\n"
 
@@ -185,17 +173,13 @@ class NotificationService:
                         return result.get("ok", False)
                     else:
                         error_text = await response.text()
-                        logger.error(
-                            f"Telegram API error: {response.status} - {error_text}"
-                        )
+                        logger.error(f"Telegram API error: {response.status} - {error_text}")
                         return False
             except Exception as e:
                 logger.error(f"Error sending Telegram message: {e!s}")
                 return False
 
-    async def notify_multiple_drivers(
-        self, load_id: int, driver_ids: list
-    ) -> dict[int, bool]:
+    async def notify_multiple_drivers(self, load_id: int, driver_ids: list) -> dict[int, bool]:
         """
         Notify multiple drivers about a load (useful for cross-company broadcasts).
 
@@ -251,9 +235,7 @@ class NotificationService:
                     chat = chat_result.scalar_one_or_none()
 
                     if chat and chat.chat_token:
-                        company_name = (
-                            driver.company.name if driver.company else "No Company"
-                        )
+                        company_name = driver.company.name if driver.company else "No Company"
 
                         # Enhanced broadcast message with company context
                         formatted_message = (
@@ -278,9 +260,7 @@ class NotificationService:
                             failed_count += 1
 
                 except Exception as e:
-                    logger.error(
-                        f"Failed to send broadcast to driver {driver.name}: {e}"
-                    )
+                    logger.error(f"Failed to send broadcast to driver {driver.name}: {e}")
                     failed_count += 1
 
             return {
@@ -316,9 +296,7 @@ class NotificationService:
         """
         try:
             # Get company info
-            result = await self.db.execute(
-                select(Company).where(Company.id == company_id)
-            )
+            result = await self.db.execute(select(Company).where(Company.id == company_id))
             company = result.scalar_one_or_none()
             if not company:
                 return {
@@ -329,9 +307,7 @@ class NotificationService:
 
             # Get drivers from specific company with Telegram
             result = await self.db.execute(
-                select(Driver).where(
-                    Driver.company_id == company_id, Driver.chat_id.isnot(None)
-                )
+                select(Driver).where(Driver.company_id == company_id, Driver.chat_id.isnot(None))
             )
             drivers = list(result.scalars().all())
 
@@ -366,9 +342,7 @@ class NotificationService:
                             failed_count += 1
 
                 except Exception as e:
-                    logger.error(
-                        f"Failed to send company broadcast to driver {driver.name}: {e}"
-                    )
+                    logger.error(f"Failed to send company broadcast to driver {driver.name}: {e}")
                     failed_count += 1
 
             return {
@@ -400,9 +374,7 @@ class NotificationService:
             # Get load and driver info
             load = await self.load_repository.get_load_by_id(load_id)
             result = await self.db.execute(
-                select(Driver)
-                .options(selectinload(Driver.company))
-                .where(Driver.id == driver_id)
+                select(Driver).options(selectinload(Driver.company)).where(Driver.id == driver_id)
             )
             driver = result.scalar_one_or_none()
 
@@ -410,9 +382,7 @@ class NotificationService:
                 return False
 
             # Check if it's actually a cross-company assignment
-            is_cross_company = (
-                driver.company_id != load.company_id if load.company_id else False
-            )
+            is_cross_company = driver.company_id != load.company_id if load.company_id else False
 
             if not is_cross_company:
                 # Use regular notification for same-company assignments
@@ -468,9 +438,7 @@ class NotificationService:
         """
         try:
             # Get all drivers (eager-load company so we can read driver.company.name later)
-            result = await self.db.execute(
-                select(Driver).options(selectinload(Driver.company))
-            )
+            result = await self.db.execute(select(Driver).options(selectinload(Driver.company)))
             all_drivers = list(result.scalars().all())
 
             # Get drivers with Telegram
@@ -493,9 +461,7 @@ class NotificationService:
             return {
                 "total_drivers": len(all_drivers),
                 "telegram_enabled_drivers": len(telegram_drivers),
-                "notification_coverage": (
-                    len(telegram_drivers) / len(all_drivers) * 100
-                )
+                "notification_coverage": (len(telegram_drivers) / len(all_drivers) * 100)
                 if all_drivers
                 else 0,
                 "company_breakdown": company_stats,

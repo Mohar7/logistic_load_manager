@@ -60,7 +60,7 @@ class MessageFormatters:
         return text
 
     @staticmethod
-    def format_load_details(load: Load, legs: list = None) -> str:
+    def format_load_details(load: Load, legs: list | None = None) -> str:
         """Format detailed load information"""
         trip_id = escape_markdown(str(load.trip_id))
         pickup = escape_markdown(str(load.pickup_address))
@@ -153,8 +153,7 @@ class MessageFormatters:
             text += f"• Telegram-Enabled: {stats['drivers'].get('telegram', 0)}\n"
             if stats["drivers"].get("total", 0) > 0:
                 coverage = (
-                    stats["drivers"].get("telegram", 0)
-                    / stats["drivers"].get("total", 1)
+                    stats["drivers"].get("telegram", 0) / stats["drivers"].get("total", 1)
                 ) * 100
                 text += f"• Coverage: {coverage:.1f}%\n\n"
 

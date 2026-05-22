@@ -169,14 +169,10 @@ async def update_load(
     load_service = LoadService(db)
 
     try:
-        result = await load_service.update_load(
-            load_id, load_update.dict(exclude_unset=True)
-        )
+        result = await load_service.update_load(load_id, load_update.dict(exclude_unset=True))
 
         if not result:
-            raise HTTPException(
-                status_code=404, detail=f"Load with ID {load_id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Load with ID {load_id} not found")
 
         # Transform the result to match the expected response model
         load = result["load"]
@@ -241,14 +237,10 @@ async def update_load_with_parsed_data(
     load_service = LoadService(db)
 
     try:
-        result = await load_service.update_load_with_parsed_data(
-            load_id, text, dispatcher_id
-        )
+        result = await load_service.update_load_with_parsed_data(load_id, text, dispatcher_id)
 
         if not result:
-            raise HTTPException(
-                status_code=404, detail=f"Load with ID {load_id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Load with ID {load_id} not found")
 
         # Transform the result to match the expected response model
         load = result["load"]
@@ -307,9 +299,7 @@ async def delete_load(load_id: int, db: AsyncSession = Depends(get_db)):
         success = await load_service.delete_load(load_id)
 
         if not success:
-            raise HTTPException(
-                status_code=404, detail=f"Load with ID {load_id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Load with ID {load_id} not found")
 
         return {"message": f"Load {load_id} deleted successfully"}
 
@@ -318,9 +308,7 @@ async def delete_load(load_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/", response_model=list[LoadResponse])
-async def get_loads(
-    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)
-):
+async def get_loads(skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)):
     """
     Get all loads with pagination.
     """
@@ -382,9 +370,7 @@ async def update_dispatcher_for_load(
     """
     load_service = LoadService(db)
     try:
-        await load_service.update_dispatcher_for_load(
-            load_id=load_id, dispatcher_id=dispatcher_id
-        )
+        await load_service.update_dispatcher_for_load(load_id=load_id, dispatcher_id=dispatcher_id)
         return {"message": "success"}
     except Exception as e:
         return {"message": "error", "error": str(e)}

@@ -72,24 +72,28 @@ class DispatcherHandler:
                     text += f"👤 {driver_escaped}\n"
                 text += "\n"
 
-                keyboard_buttons.append([
-                    InlineKeyboardButton(
-                        text=f"📋 {load.trip_id}",
-                        callback_data=f"view_load_{load.id}",
-                    )
-                ])
+                keyboard_buttons.append(
+                    [
+                        InlineKeyboardButton(
+                            text=f"📋 {load.trip_id}",
+                            callback_data=f"view_load_{load.id}",
+                        )
+                    ]
+                )
 
             if len(loads) > 10:
-                keyboard_buttons.append([
-                    InlineKeyboardButton(
-                        text=f"➡️ Show More ({len(loads) - 10} remaining)",
-                        callback_data="more_loads"
-                    )
-                ])
+                keyboard_buttons.append(
+                    [
+                        InlineKeyboardButton(
+                            text=f"➡️ Show More ({len(loads) - 10} remaining)",
+                            callback_data="more_loads",
+                        )
+                    ]
+                )
 
-            keyboard_buttons.append([
-                InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")
-            ])
+            keyboard_buttons.append(
+                [InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")]
+            )
 
             await callback.message.edit_text(
                 text,
@@ -104,7 +108,9 @@ class DispatcherHandler:
     async def handle_assign_driver(callback: types.CallbackQuery, db: AsyncSession):
         """Handle driver assignment to load - UPDATED FOR ALL DRIVERS"""
         # Validate callback data
-        is_valid, parts = CallbackDataValidator.validate_callback_data(callback.data, 3, "assign_driver")
+        is_valid, parts = CallbackDataValidator.validate_callback_data(
+            callback.data, 3, "assign_driver"
+        )
         if not is_valid:
             await callback.answer("Invalid request data!", show_alert=True)
             return
@@ -134,30 +140,34 @@ class DispatcherHandler:
 
         # Add company selection buttons first for better UX
         if len(drivers_by_company) > 3:  # If many companies, show company filter
-            keyboard_buttons.append([
-                InlineKeyboardButton(
-                    text="🏢 Filter by Company",
-                    callback_data=f"filter_company_{load_id}"
-                )
-            ])
-            keyboard_buttons.append([
-                InlineKeyboardButton(
-                    text="👥 Show All Drivers",
-                    callback_data=f"show_all_drivers_{load_id}"
-                )
-            ])
+            keyboard_buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text="🏢 Filter by Company", callback_data=f"filter_company_{load_id}"
+                    )
+                ]
+            )
+            keyboard_buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text="👥 Show All Drivers", callback_data=f"show_all_drivers_{load_id}"
+                    )
+                ]
+            )
 
         # Add drivers organized by company (limit display to prevent overflow)
         total_shown = 0
         for company_name, company_drivers in drivers_by_company.items():
             # Add company header for organization
             if len(drivers_by_company) > 1:
-                keyboard_buttons.append([
-                    InlineKeyboardButton(
-                        text=f"🏢 {company_name} ({len(company_drivers)} drivers)",
-                        callback_data="company_header"  # Non-functional, just for display
-                    )
-                ])
+                keyboard_buttons.append(
+                    [
+                        InlineKeyboardButton(
+                            text=f"🏢 {company_name} ({len(company_drivers)} drivers)",
+                            callback_data="company_header",  # Non-functional, just for display
+                        )
+                    ]
+                )
 
             # Add drivers from this company
             for driver in company_drivers[:5]:  # Limit per company to prevent overflow
@@ -172,12 +182,14 @@ class DispatcherHandler:
                 if len(drivers_by_company) > 1:
                     driver_text += f" ({company_name})"
 
-                keyboard_buttons.append([
-                    InlineKeyboardButton(
-                        text=driver_text,
-                        callback_data=f"select_driver_{load_id}_{driver.id}",
-                    )
-                ])
+                keyboard_buttons.append(
+                    [
+                        InlineKeyboardButton(
+                            text=driver_text,
+                            callback_data=f"select_driver_{load_id}_{driver.id}",
+                        )
+                    ]
+                )
                 total_shown += 1
 
             if total_shown >= 15:
@@ -185,16 +197,18 @@ class DispatcherHandler:
 
         # Add pagination or "show more" if there are many drivers
         if total_shown < len(drivers):
-            keyboard_buttons.append([
-                InlineKeyboardButton(
-                    text=f"➡️ Show More ({len(drivers) - total_shown} remaining)",
-                    callback_data=f"show_more_drivers_{load_id}_{total_shown}"
-                )
-            ])
+            keyboard_buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text=f"➡️ Show More ({len(drivers) - total_shown} remaining)",
+                        callback_data=f"show_more_drivers_{load_id}_{total_shown}",
+                    )
+                ]
+            )
 
-        keyboard_buttons.append([
-            InlineKeyboardButton(text="🔙 Back", callback_data=f"view_load_{load_id}")
-        ])
+        keyboard_buttons.append(
+            [InlineKeyboardButton(text="🔙 Back", callback_data=f"view_load_{load_id}")]
+        )
 
         message_text = (
             f"🚛 *Select driver for load:*\n\n"
@@ -234,20 +248,24 @@ class DispatcherHandler:
                 button_text += f", {telegram_count} 📱"
             button_text += ")"
 
-            keyboard_buttons.append([
-                InlineKeyboardButton(
-                    text=button_text,
-                    callback_data=f"company_drivers_{load_id}_{company.id}"
-                )
-            ])
+            keyboard_buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text=button_text, callback_data=f"company_drivers_{load_id}_{company.id}"
+                    )
+                ]
+            )
 
-        keyboard_buttons.extend([
-            [InlineKeyboardButton(
-                text="👥 Show All Drivers",
-                callback_data=f"assign_driver_{load_id}"
-            )],
-            [InlineKeyboardButton(text="🔙 Back", callback_data=f"view_load_{load_id}")]
-        ])
+        keyboard_buttons.extend(
+            [
+                [
+                    InlineKeyboardButton(
+                        text="👥 Show All Drivers", callback_data=f"assign_driver_{load_id}"
+                    )
+                ],
+                [InlineKeyboardButton(text="🔙 Back", callback_data=f"view_load_{load_id}")],
+            ]
+        )
 
         await callback.message.edit_text(
             "🏢 *Select Company:*\n\nChoose a company to view its drivers:",
@@ -281,20 +299,25 @@ class DispatcherHandler:
             if driver.chat_id:
                 driver_text += " 📱"
 
-            keyboard_buttons.append([
-                InlineKeyboardButton(
-                    text=driver_text,
-                    callback_data=f"select_driver_{load_id}_{driver.id}",
-                )
-            ])
+            keyboard_buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text=driver_text,
+                        callback_data=f"select_driver_{load_id}_{driver.id}",
+                    )
+                ]
+            )
 
-        keyboard_buttons.extend([
-            [InlineKeyboardButton(
-                text="🏢 Other Companies",
-                callback_data=f"filter_company_{load_id}"
-            )],
-            [InlineKeyboardButton(text="🔙 Back", callback_data=f"view_load_{load_id}")]
-        ])
+        keyboard_buttons.extend(
+            [
+                [
+                    InlineKeyboardButton(
+                        text="🏢 Other Companies", callback_data=f"filter_company_{load_id}"
+                    )
+                ],
+                [InlineKeyboardButton(text="🔙 Back", callback_data=f"view_load_{load_id}")],
+            ]
+        )
 
         company_escaped = escape_markdown(company_name)
         await callback.message.edit_text(
@@ -343,6 +366,7 @@ class DispatcherHandler:
             from sqlalchemy.orm import selectinload
 
             from app.db.models import Driver
+
             driver = (
                 await db.execute(
                     select(Driver)
@@ -397,7 +421,9 @@ class DispatcherHandler:
     async def handle_driver_selection(callback: types.CallbackQuery, db: AsyncSession):
         """Handle driver selection for load assignment - UPDATED FOR CROSS-COMPANY"""
         # Validate callback data
-        is_valid, parts = CallbackDataValidator.validate_callback_data(callback.data, 4, "select_driver")
+        is_valid, parts = CallbackDataValidator.validate_callback_data(
+            callback.data, 4, "select_driver"
+        )
         if not is_valid:
             await callback.answer("Invalid request data!", show_alert=True)
             return
@@ -414,6 +440,7 @@ class DispatcherHandler:
 
             # Get driver and load info
             from app.db.repositories.driver_repository import DriverRepository
+
             driver_repo = DriverRepository(db)
             driver = await driver_repo.get_driver_by_id(driver_id)
             load_data = await load_service.get_load_details(load_id)
@@ -454,28 +481,28 @@ class DispatcherHandler:
 
                 # Add notification button if driver has Telegram
                 if driver.chat_id:
-                    keyboard_buttons.append([
-                        InlineKeyboardButton(
-                            text="📢 Notify Driver",
-                            callback_data=f"notify_driver_{load_id}",
-                        )
-                    ])
+                    keyboard_buttons.append(
+                        [
+                            InlineKeyboardButton(
+                                text="📢 Notify Driver",
+                                callback_data=f"notify_driver_{load_id}",
+                            )
+                        ]
+                    )
                 else:
                     success_message += "\n⚠️ Driver doesn't have Telegram notifications set up"
 
-                keyboard_buttons.extend([
+                keyboard_buttons.extend(
                     [
-                        InlineKeyboardButton(
-                            text="📋 View Load Details",
-                            callback_data=f"view_load_{load_id}",
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text="🔙 Back to Loads", callback_data="all_loads"
-                        )
-                    ],
-                ])
+                        [
+                            InlineKeyboardButton(
+                                text="📋 View Load Details",
+                                callback_data=f"view_load_{load_id}",
+                            )
+                        ],
+                        [InlineKeyboardButton(text="🔙 Back to Loads", callback_data="all_loads")],
+                    ]
+                )
 
                 await callback.message.edit_text(
                     success_message,
@@ -501,12 +528,11 @@ class DispatcherHandler:
             success = await notification_service.notify_driver_about_load(load_id)
 
             if success:
-                await callback.answer(
-                    "✅ Notification sent successfully!", show_alert=True
-                )
+                await callback.answer("✅ Notification sent successfully!", show_alert=True)
             else:
                 await callback.answer(
-                    "❌ Failed to send notification! Driver may not have Telegram set up.", show_alert=True
+                    "❌ Failed to send notification! Driver may not have Telegram set up.",
+                    show_alert=True,
                 )
 
         except Exception as e:
@@ -520,36 +546,28 @@ class DispatcherHandler:
             inline_keyboard=[
                 [
                     InlineKeyboardButton(
-                        text="📢 All Drivers (All Companies)",
-                        callback_data="broadcast_all_drivers"
+                        text="📢 All Drivers (All Companies)", callback_data="broadcast_all_drivers"
                     )
                 ],
                 [
                     InlineKeyboardButton(
-                        text="🏢 Drivers by Company",
-                        callback_data="broadcast_by_company"
+                        text="🏢 Drivers by Company", callback_data="broadcast_by_company"
                     )
                 ],
                 [
                     InlineKeyboardButton(
                         text="📱 Only Telegram-Enabled Drivers",
-                        callback_data="broadcast_telegram_only"
+                        callback_data="broadcast_telegram_only",
                     )
                 ],
-                [
-                    InlineKeyboardButton(
-                        text="🔙 Cancel",
-                        callback_data="send_notifications"
-                    )
-                ]
+                [InlineKeyboardButton(text="🔙 Cancel", callback_data="send_notifications")],
             ]
         )
 
         await callback.message.edit_text(
-            "*Broadcast Message*\n\n"
-            "Choose the scope of your broadcast:",
+            "*Broadcast Message*\n\n" "Choose the scope of your broadcast:",
             reply_markup=keyboard,
-            parse_mode="Markdown"
+            parse_mode="Markdown",
         )
         await callback.answer()
 
@@ -563,12 +581,14 @@ class DispatcherHandler:
             "*Broadcast to All Drivers*\n\n"
             "Enter the message you want to send to *all drivers across all companies*:\n\n"
             "⚠️ This will send to ALL drivers with Telegram notifications enabled.",
-            parse_mode="Markdown"
+            parse_mode="Markdown",
         )
         await callback.answer()
 
     @staticmethod
-    async def handle_broadcast_by_company(callback: types.CallbackQuery, state: FSMContext, db: AsyncSession):
+    async def handle_broadcast_by_company(
+        callback: types.CallbackQuery, state: FSMContext, db: AsyncSession
+    ):
         """Handle broadcast by company selection"""
         load_service = LoadBotService(db)
         companies = await load_service.get_all_companies()
@@ -583,23 +603,23 @@ class DispatcherHandler:
             telegram_drivers = sum(1 for d in company_drivers if d.chat_id)
 
             button_text = f"🏢 {company.name} ({telegram_drivers} drivers)"
-            keyboard_buttons.append([
-                InlineKeyboardButton(
-                    text=button_text,
-                    callback_data=f"broadcast_company_{company.id}"
-                )
-            ])
+            keyboard_buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text=button_text, callback_data=f"broadcast_company_{company.id}"
+                    )
+                ]
+            )
 
-        keyboard_buttons.append([
-            InlineKeyboardButton(text="🔙 Back", callback_data="broadcast_message")
-        ])
+        keyboard_buttons.append(
+            [InlineKeyboardButton(text="🔙 Back", callback_data="broadcast_message")]
+        )
 
         await state.set_state(NotificationStates.waiting_for_company_selection)
         await callback.message.edit_text(
-            "*Select Company for Broadcast:*\n\n"
-            "Choose which company's drivers to notify:",
+            "*Select Company for Broadcast:*\n\n" "Choose which company's drivers to notify:",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard_buttons),
-            parse_mode="Markdown"
+            parse_mode="Markdown",
         )
         await callback.answer()
 
@@ -612,7 +632,7 @@ class DispatcherHandler:
         await callback.message.edit_text(
             "*Broadcast to Telegram-Enabled Drivers*\n\n"
             "Enter the message you want to send to *all drivers with Telegram notifications* (across all companies):",
-            parse_mode="Markdown"
+            parse_mode="Markdown",
         )
         await callback.answer()
 
@@ -638,7 +658,7 @@ class DispatcherHandler:
         await callback.message.edit_text(
             f"*Broadcast to {company_escaped}*\n\n"
             f"Enter the message you want to send to all drivers in *{company_escaped}*:",
-            parse_mode="Markdown"
+            parse_mode="Markdown",
         )
         await callback.answer()
 
@@ -715,9 +735,7 @@ class DispatcherHandler:
                             f"Driver: {driver.name} ({company_name})"
                         )
                         await bot.send_message(
-                            chat_id=chat.chat_token,
-                            text=formatted_message,
-                            parse_mode="Markdown"
+                            chat_id=chat.chat_token, text=formatted_message, parse_mode="Markdown"
                         )
                         sent_count += 1
                         company_breakdown[company_name] += 1
@@ -756,7 +774,7 @@ class DispatcherHandler:
         all_drivers = await load_service.get_available_drivers()
 
         # Show next batch of drivers
-        drivers_to_show = all_drivers[offset:offset + 15]
+        drivers_to_show = all_drivers[offset : offset + 15]
 
         if not drivers_to_show:
             await callback.answer("No more drivers to show!", show_alert=True)
@@ -772,12 +790,13 @@ class DispatcherHandler:
 
         for company_name, company_drivers in drivers_by_company.items():
             if len(drivers_by_company) > 1:
-                keyboard_buttons.append([
-                    InlineKeyboardButton(
-                        text=f"🏢 {company_name}",
-                        callback_data="company_header"
-                    )
-                ])
+                keyboard_buttons.append(
+                    [
+                        InlineKeyboardButton(
+                            text=f"🏢 {company_name}", callback_data="company_header"
+                        )
+                    ]
+                )
 
             for driver in company_drivers:
                 driver_text = f"👤 {driver.name}"
@@ -786,12 +805,14 @@ class DispatcherHandler:
                 if len(drivers_by_company) > 1:
                     driver_text += f" ({company_name})"
 
-                keyboard_buttons.append([
-                    InlineKeyboardButton(
-                        text=driver_text,
-                        callback_data=f"select_driver_{load_id}_{driver.id}",
-                    )
-                ])
+                keyboard_buttons.append(
+                    [
+                        InlineKeyboardButton(
+                            text=driver_text,
+                            callback_data=f"select_driver_{load_id}_{driver.id}",
+                        )
+                    ]
+                )
 
         # Add navigation buttons
         nav_buttons = []
@@ -799,28 +820,30 @@ class DispatcherHandler:
             nav_buttons.append(
                 InlineKeyboardButton(
                     text="⬅️ Previous",
-                    callback_data=f"show_more_drivers_{load_id}_{max(0, offset - 15)}"
+                    callback_data=f"show_more_drivers_{load_id}_{max(0, offset - 15)}",
                 )
             )
 
         if offset + 15 < len(all_drivers):
             nav_buttons.append(
                 InlineKeyboardButton(
-                    text="Next ➡️",
-                    callback_data=f"show_more_drivers_{load_id}_{offset + 15}"
+                    text="Next ➡️", callback_data=f"show_more_drivers_{load_id}_{offset + 15}"
                 )
             )
 
         if nav_buttons:
             keyboard_buttons.append(nav_buttons)
 
-        keyboard_buttons.extend([
-            [InlineKeyboardButton(
-                text="🏢 Filter by Company",
-                callback_data=f"filter_company_{load_id}"
-            )],
-            [InlineKeyboardButton(text="🔙 Back", callback_data=f"view_load_{load_id}")]
-        ])
+        keyboard_buttons.extend(
+            [
+                [
+                    InlineKeyboardButton(
+                        text="🏢 Filter by Company", callback_data=f"filter_company_{load_id}"
+                    )
+                ],
+                [InlineKeyboardButton(text="🔙 Back", callback_data=f"view_load_{load_id}")],
+            ]
+        )
 
         current_range = f"{offset + 1}-{min(offset + 15, len(all_drivers))}"
         message_text = (
@@ -838,7 +861,9 @@ class DispatcherHandler:
         await callback.answer()
 
     @staticmethod
-    async def handle_unassigned_loads(callback: types.CallbackQuery, db: AsyncSession, user_data: dict):
+    async def handle_unassigned_loads(
+        callback: types.CallbackQuery, db: AsyncSession, user_data: dict
+    ):
         """Handle unassigned loads view"""
         if not user_data or user_data["role"] != "dispatcher":
             await callback.answer("Access denied!", show_alert=True)
@@ -853,9 +878,9 @@ class DispatcherHandler:
                 reply_markup=InlineKeyboardMarkup(
                     inline_keyboard=[
                         [InlineKeyboardButton(text="📋 View All Loads", callback_data="all_loads")],
-                        [InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")]
+                        [InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")],
                     ]
-                )
+                ),
             )
         else:
             text = f"⏳ Unassigned Loads ({len(unassigned_loads)}):\n\n"
@@ -875,16 +900,18 @@ class DispatcherHandler:
                 text += f"💰 ${float(load.rate):,.2f}\n"
                 text += f"📅 {load.start_time_str}\n\n"
 
-                keyboard_buttons.append([
-                    InlineKeyboardButton(
-                        text=f"🚛 Assign {load.trip_id}",
-                        callback_data=f"assign_driver_{load.id}",
-                    )
-                ])
+                keyboard_buttons.append(
+                    [
+                        InlineKeyboardButton(
+                            text=f"🚛 Assign {load.trip_id}",
+                            callback_data=f"assign_driver_{load.id}",
+                        )
+                    ]
+                )
 
-            keyboard_buttons.append([
-                InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")
-            ])
+            keyboard_buttons.append(
+                [InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")]
+            )
 
             await callback.message.edit_text(
                 text,
@@ -941,14 +968,16 @@ class DispatcherHandler:
             text += "\n*📊 Summary:*\n"
             text += f"• Total Drivers: {len(drivers_info)}\n"
             text += f"• With Telegram: {telegram_count}\n"
-            text += f"• Companies: {len(set(d['company_name'] for d in drivers_info))}\n"
+            text += f"• Companies: {len({d['company_name'] for d in drivers_info})}\n"
 
             keyboard_buttons = [
                 [
-                    InlineKeyboardButton(text="📢 Broadcast Message", callback_data="broadcast_message"),
-                    InlineKeyboardButton(text="🏢 By Company", callback_data="drivers_by_company")
+                    InlineKeyboardButton(
+                        text="📢 Broadcast Message", callback_data="broadcast_message"
+                    ),
+                    InlineKeyboardButton(text="🏢 By Company", callback_data="drivers_by_company"),
                 ],
-                [InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")]
+                [InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")],
             ]
 
             await callback.message.edit_text(
@@ -960,7 +989,9 @@ class DispatcherHandler:
         await callback.answer()
 
     @staticmethod
-    async def handle_all_companies(callback: types.CallbackQuery, db: AsyncSession, user_data: dict):
+    async def handle_all_companies(
+        callback: types.CallbackQuery, db: AsyncSession, user_data: dict
+    ):
         """Handle all companies view"""
         if not user_data or user_data["role"] != "dispatcher":
             await callback.answer("Access denied!", show_alert=True)
@@ -991,16 +1022,17 @@ class DispatcherHandler:
                 text += f"• Loads: {stat['total_loads']} ({stat['unassigned_loads']} unassigned)\n"
                 text += f"• DOT: {company.usdot} | MC: {company.mc}\n\n"
 
-                keyboard_buttons.append([
-                    InlineKeyboardButton(
-                        text=f"🏢 {company.name}",
-                        callback_data=f"company_details_{company.id}"
-                    )
-                ])
+                keyboard_buttons.append(
+                    [
+                        InlineKeyboardButton(
+                            text=f"🏢 {company.name}", callback_data=f"company_details_{company.id}"
+                        )
+                    ]
+                )
 
-            keyboard_buttons.append([
-                InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")
-            ])
+            keyboard_buttons.append(
+                [InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")]
+            )
 
             await callback.message.edit_text(
                 text,
@@ -1015,7 +1047,9 @@ class DispatcherHandler:
     async def handle_company_details(callback: types.CallbackQuery, db: AsyncSession):
         """Handle company details view"""
         # Validate callback data
-        is_valid, parts = CallbackDataValidator.validate_callback_data(callback.data, 3, "company_details")
+        is_valid, parts = CallbackDataValidator.validate_callback_data(
+            callback.data, 3, "company_details"
+        )
         if not is_valid:
             await callback.answer("Invalid request data!", show_alert=True)
             return
@@ -1071,22 +1105,22 @@ class DispatcherHandler:
                 [
                     InlineKeyboardButton(
                         text=f"📋 View Loads ({len(loads)})",
-                        callback_data=f"company_loads_{company_id}"
+                        callback_data=f"company_loads_{company_id}",
                     )
                 ],
                 [
                     InlineKeyboardButton(
                         text=f"👥 View Drivers ({len(drivers)})",
-                        callback_data=f"company_drivers_list_{company_id}"
+                        callback_data=f"company_drivers_list_{company_id}",
                     )
                 ],
                 [
                     InlineKeyboardButton(
                         text="📢 Broadcast to Company",
-                        callback_data=f"broadcast_company_{company_id}"
+                        callback_data=f"broadcast_company_{company_id}",
                     )
                 ],
-                [InlineKeyboardButton(text="🔙 Back", callback_data="all_companies")]
+                [InlineKeyboardButton(text="🔙 Back", callback_data="all_companies")],
             ]
         )
 
@@ -1104,19 +1138,31 @@ class DispatcherHandler:
             from app.db.models import Company, Dispatchers, Driver, Load
 
             total_loads = (await db.execute(select(func.count()).select_from(Load))).scalar_one()
-            total_drivers = (await db.execute(select(func.count()).select_from(Driver))).scalar_one()
-            total_companies = (await db.execute(select(func.count()).select_from(Company))).scalar_one()
-            total_dispatchers = (await db.execute(select(func.count()).select_from(Dispatchers))).scalar_one()
+            total_drivers = (
+                await db.execute(select(func.count()).select_from(Driver))
+            ).scalar_one()
+            total_companies = (
+                await db.execute(select(func.count()).select_from(Company))
+            ).scalar_one()
+            total_dispatchers = (
+                await db.execute(select(func.count()).select_from(Dispatchers))
+            ).scalar_one()
 
-            unassigned_loads = (await db.execute(
-                select(func.count()).select_from(Load).where(Load.driver_id.is_(None))
-            )).scalar_one()
-            assigned_loads = (await db.execute(
-                select(func.count()).select_from(Load).where(Load.driver_id.isnot(None))
-            )).scalar_one()
-            telegram_drivers = (await db.execute(
-                select(func.count()).select_from(Driver).where(Driver.chat_id.isnot(None))
-            )).scalar_one()
+            unassigned_loads = (
+                await db.execute(
+                    select(func.count()).select_from(Load).where(Load.driver_id.is_(None))
+                )
+            ).scalar_one()
+            assigned_loads = (
+                await db.execute(
+                    select(func.count()).select_from(Load).where(Load.driver_id.isnot(None))
+                )
+            ).scalar_one()
+            telegram_drivers = (
+                await db.execute(
+                    select(func.count()).select_from(Driver).where(Driver.chat_id.isnot(None))
+                )
+            ).scalar_one()
 
             stats_text = f"""
 📊 *System Statistics*
@@ -1144,14 +1190,10 @@ class DispatcherHandler:
                 stats_text,
                 reply_markup=InlineKeyboardMarkup(
                     inline_keyboard=[
-                        [
-                            InlineKeyboardButton(
-                                text="🔙 Back", callback_data="back_to_menu"
-                            )
-                        ]
+                        [InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")]
                     ]
                 ),
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             )
 
         except Exception as e:
@@ -1160,11 +1202,7 @@ class DispatcherHandler:
                 "❌ Error retrieving system statistics.",
                 reply_markup=InlineKeyboardMarkup(
                     inline_keyboard=[
-                        [
-                            InlineKeyboardButton(
-                                text="🔙 Back", callback_data="back_to_menu"
-                            )
-                        ]
+                        [InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")]
                     ]
                 ),
             )
@@ -1172,7 +1210,9 @@ class DispatcherHandler:
         await callback.answer()
 
     @staticmethod
-    async def handle_send_to_driver(callback: types.CallbackQuery, user_data: dict, db: AsyncSession):
+    async def handle_send_to_driver(
+        callback: types.CallbackQuery, user_data: dict, db: AsyncSession
+    ):
         """Handle send message to specific driver"""
         if not user_data or user_data["role"] != "dispatcher":
             await callback.answer("Access denied!", show_alert=True)
@@ -1183,13 +1223,17 @@ class DispatcherHandler:
 
             from app.db.models import Driver
 
-            drivers = list((
-                await db.execute(
-                    select(Driver)
-                    .options(selectinload(Driver.company))
-                    .where(Driver.chat_id.isnot(None))
+            drivers = list(
+                (
+                    await db.execute(
+                        select(Driver)
+                        .options(selectinload(Driver.company))
+                        .where(Driver.chat_id.isnot(None))
+                    )
                 )
-            ).scalars().all())
+                .scalars()
+                .all()
+            )
 
             if not drivers:
                 await callback.message.edit_text(
@@ -1224,11 +1268,7 @@ class DispatcherHandler:
                     )
 
                 keyboard_buttons.append(
-                    [
-                        InlineKeyboardButton(
-                            text="🔙 Back", callback_data="send_notifications"
-                        )
-                    ]
+                    [InlineKeyboardButton(text="🔙 Back", callback_data="send_notifications")]
                 )
 
                 await callback.message.edit_text(
@@ -1242,11 +1282,7 @@ class DispatcherHandler:
                 "❌ Error retrieving drivers.",
                 reply_markup=InlineKeyboardMarkup(
                     inline_keyboard=[
-                        [
-                            InlineKeyboardButton(
-                                text="🔙 Back", callback_data="send_notifications"
-                            )
-                        ]
+                        [InlineKeyboardButton(text="🔙 Back", callback_data="send_notifications")]
                     ]
                 ),
             )
@@ -1278,30 +1314,34 @@ class DispatcherHandler:
 
         # Add company selection buttons first for better UX
         if len(drivers_by_company) > 3:  # If many companies, show company filter
-            keyboard_buttons.append([
-                InlineKeyboardButton(
-                    text="🏢 Filter by Company",
-                    callback_data=f"filter_company_{load_id}"
-                )
-            ])
-            keyboard_buttons.append([
-                InlineKeyboardButton(
-                    text="👥 Show All Drivers",
-                    callback_data=f"show_all_drivers_{load_id}"
-                )
-            ])
+            keyboard_buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text="🏢 Filter by Company", callback_data=f"filter_company_{load_id}"
+                    )
+                ]
+            )
+            keyboard_buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text="👥 Show All Drivers", callback_data=f"show_all_drivers_{load_id}"
+                    )
+                ]
+            )
 
         # Add drivers organized by company (limit display to prevent overflow)
         total_shown = 0
         for company_name, company_drivers in drivers_by_company.items():
             # Add company header for organization
             if len(drivers_by_company) > 1:
-                keyboard_buttons.append([
-                    InlineKeyboardButton(
-                        text=f"🏢 {company_name} ({len(company_drivers)} drivers)",
-                        callback_data="company_header"  # Non-functional, just for display
-                    )
-                ])
+                keyboard_buttons.append(
+                    [
+                        InlineKeyboardButton(
+                            text=f"🏢 {company_name} ({len(company_drivers)} drivers)",
+                            callback_data="company_header",  # Non-functional, just for display
+                        )
+                    ]
+                )
 
             # Add drivers from this company
             for driver in company_drivers[:5]:  # Limit per company to prevent overflow
@@ -1316,12 +1356,14 @@ class DispatcherHandler:
                 if len(drivers_by_company) > 1:
                     driver_text += f" ({company_name})"
 
-                keyboard_buttons.append([
-                    InlineKeyboardButton(
-                        text=driver_text,
-                        callback_data=f"select_driver_{load_id}_{driver.id}",
-                    )
-                ])
+                keyboard_buttons.append(
+                    [
+                        InlineKeyboardButton(
+                            text=driver_text,
+                            callback_data=f"select_driver_{load_id}_{driver.id}",
+                        )
+                    ]
+                )
                 total_shown += 1
 
             if total_shown >= 15:
@@ -1329,16 +1371,18 @@ class DispatcherHandler:
 
         # Add pagination or "show more" if there are many drivers
         if total_shown < len(drivers):
-            keyboard_buttons.append([
-                InlineKeyboardButton(
-                    text=f"➡️ Show More ({len(drivers) - total_shown} remaining)",
-                    callback_data=f"show_more_drivers_{load_id}_{total_shown}"
-                )
-            ])
+            keyboard_buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text=f"➡️ Show More ({len(drivers) - total_shown} remaining)",
+                        callback_data=f"show_more_drivers_{load_id}_{total_shown}",
+                    )
+                ]
+            )
 
-        keyboard_buttons.append([
-            InlineKeyboardButton(text="🔙 Back", callback_data=f"view_load_{load_id}")
-        ])
+        keyboard_buttons.append(
+            [InlineKeyboardButton(text="🔙 Back", callback_data=f"view_load_{load_id}")]
+        )
 
         message_text = (
             f"🚛 **Select driver for load:**\n\n"
@@ -1378,20 +1422,24 @@ class DispatcherHandler:
                 button_text += f", {telegram_count} 📱"
             button_text += ")"
 
-            keyboard_buttons.append([
-                InlineKeyboardButton(
-                    text=button_text,
-                    callback_data=f"company_drivers_{load_id}_{company.id}"
-                )
-            ])
+            keyboard_buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text=button_text, callback_data=f"company_drivers_{load_id}_{company.id}"
+                    )
+                ]
+            )
 
-        keyboard_buttons.extend([
-            [InlineKeyboardButton(
-                text="👥 Show All Drivers",
-                callback_data=f"assign_driver_{load_id}"
-            )],
-            [InlineKeyboardButton(text="🔙 Back", callback_data=f"view_load_{load_id}")]
-        ])
+        keyboard_buttons.extend(
+            [
+                [
+                    InlineKeyboardButton(
+                        text="👥 Show All Drivers", callback_data=f"assign_driver_{load_id}"
+                    )
+                ],
+                [InlineKeyboardButton(text="🔙 Back", callback_data=f"view_load_{load_id}")],
+            ]
+        )
 
         await callback.message.edit_text(
             "🏢 **Select Company:**\n\nChoose a company to view its drivers:",
@@ -1425,20 +1473,25 @@ class DispatcherHandler:
             if driver.chat_id:
                 driver_text += " 📱"
 
-            keyboard_buttons.append([
-                InlineKeyboardButton(
-                    text=driver_text,
-                    callback_data=f"select_driver_{load_id}_{driver.id}",
-                )
-            ])
+            keyboard_buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text=driver_text,
+                        callback_data=f"select_driver_{load_id}_{driver.id}",
+                    )
+                ]
+            )
 
-        keyboard_buttons.extend([
-            [InlineKeyboardButton(
-                text="🏢 Other Companies",
-                callback_data=f"filter_company_{load_id}"
-            )],
-            [InlineKeyboardButton(text="🔙 Back", callback_data=f"view_load_{load_id}")]
-        ])
+        keyboard_buttons.extend(
+            [
+                [
+                    InlineKeyboardButton(
+                        text="🏢 Other Companies", callback_data=f"filter_company_{load_id}"
+                    )
+                ],
+                [InlineKeyboardButton(text="🔙 Back", callback_data=f"view_load_{load_id}")],
+            ]
+        )
 
         await callback.message.edit_text(
             f"🏢 **{company_name} Drivers:**\n\n"
@@ -1480,6 +1533,7 @@ class DispatcherHandler:
             from sqlalchemy.orm import selectinload
 
             from app.db.models import Driver
+
             driver = (
                 await db.execute(
                     select(Driver)
@@ -1537,6 +1591,7 @@ class DispatcherHandler:
 
             # Get driver and load info
             from app.db.repositories.driver_repository import DriverRepository
+
             driver_repo = DriverRepository(db)
             driver = await driver_repo.get_driver_by_id(driver_id)
             load_data = await load_service.get_load_details(load_id)
@@ -1572,28 +1627,28 @@ class DispatcherHandler:
 
                 # Add notification button if driver has Telegram
                 if driver.chat_id:
-                    keyboard_buttons.append([
-                        InlineKeyboardButton(
-                            text="📢 Notify Driver",
-                            callback_data=f"notify_driver_{load_id}",
-                        )
-                    ])
+                    keyboard_buttons.append(
+                        [
+                            InlineKeyboardButton(
+                                text="📢 Notify Driver",
+                                callback_data=f"notify_driver_{load_id}",
+                            )
+                        ]
+                    )
                 else:
                     success_message += "\n⚠️ Driver doesn't have Telegram notifications set up"
 
-                keyboard_buttons.extend([
+                keyboard_buttons.extend(
                     [
-                        InlineKeyboardButton(
-                            text="📋 View Load Details",
-                            callback_data=f"view_load_{load_id}",
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text="🔙 Back to Loads", callback_data="my_loads"
-                        )
-                    ],
-                ])
+                        [
+                            InlineKeyboardButton(
+                                text="📋 View Load Details",
+                                callback_data=f"view_load_{load_id}",
+                            )
+                        ],
+                        [InlineKeyboardButton(text="🔙 Back to Loads", callback_data="my_loads")],
+                    ]
+                )
 
                 await callback.message.edit_text(
                     success_message,
@@ -1619,12 +1674,11 @@ class DispatcherHandler:
             success = await notification_service.notify_driver_about_load(load_id)
 
             if success:
-                await callback.answer(
-                    "✅ Notification sent successfully!", show_alert=True
-                )
+                await callback.answer("✅ Notification sent successfully!", show_alert=True)
             else:
                 await callback.answer(
-                    "❌ Failed to send notification! Driver may not have Telegram set up.", show_alert=True
+                    "❌ Failed to send notification! Driver may not have Telegram set up.",
+                    show_alert=True,
                 )
 
         except Exception as e:
@@ -1640,36 +1694,28 @@ class DispatcherHandler:
             inline_keyboard=[
                 [
                     InlineKeyboardButton(
-                        text="📢 All Drivers (All Companies)",
-                        callback_data="broadcast_all_drivers"
+                        text="📢 All Drivers (All Companies)", callback_data="broadcast_all_drivers"
                     )
                 ],
                 [
                     InlineKeyboardButton(
-                        text="🏢 Drivers by Company",
-                        callback_data="broadcast_by_company"
+                        text="🏢 Drivers by Company", callback_data="broadcast_by_company"
                     )
                 ],
                 [
                     InlineKeyboardButton(
                         text="📱 Only Telegram-Enabled Drivers",
-                        callback_data="broadcast_telegram_only"
+                        callback_data="broadcast_telegram_only",
                     )
                 ],
-                [
-                    InlineKeyboardButton(
-                        text="🔙 Cancel",
-                        callback_data="send_notifications"
-                    )
-                ]
+                [InlineKeyboardButton(text="🔙 Cancel", callback_data="send_notifications")],
             ]
         )
 
         await callback.message.edit_text(
-            "📢 **Broadcast Message**\n\n"
-            "Choose the scope of your broadcast:",
+            "📢 **Broadcast Message**\n\n" "Choose the scope of your broadcast:",
             reply_markup=keyboard,
-            parse_mode="Markdown"
+            parse_mode="Markdown",
         )
         await callback.answer()
 
@@ -1687,7 +1733,9 @@ class DispatcherHandler:
         await callback.answer()
 
     @staticmethod
-    async def handle_broadcast_by_company(callback: types.CallbackQuery, state: FSMContext, db: AsyncSession):
+    async def handle_broadcast_by_company(
+        callback: types.CallbackQuery, state: FSMContext, db: AsyncSession
+    ):
         """Handle broadcast by company selection"""
         load_service = LoadBotService(db)
         companies = await load_service.get_all_companies()
@@ -1702,23 +1750,23 @@ class DispatcherHandler:
             telegram_drivers = sum(1 for d in company_drivers if d.chat_id)
 
             button_text = f"🏢 {company.name} ({telegram_drivers} drivers)"
-            keyboard_buttons.append([
-                InlineKeyboardButton(
-                    text=button_text,
-                    callback_data=f"broadcast_company_{company.id}"
-                )
-            ])
+            keyboard_buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text=button_text, callback_data=f"broadcast_company_{company.id}"
+                    )
+                ]
+            )
 
-        keyboard_buttons.append([
-            InlineKeyboardButton(text="🔙 Back", callback_data="broadcast_message")
-        ])
+        keyboard_buttons.append(
+            [InlineKeyboardButton(text="🔙 Back", callback_data="broadcast_message")]
+        )
 
         await state.set_state(NotificationStates.waiting_for_company_selection)
         await callback.message.edit_text(
-            "🏢 **Select Company for Broadcast:**\n\n"
-            "Choose which company's drivers to notify:",
+            "🏢 **Select Company for Broadcast:**\n\n" "Choose which company's drivers to notify:",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard_buttons),
-            parse_mode="Markdown"
+            parse_mode="Markdown",
         )
         await callback.answer()
 
@@ -1808,9 +1856,7 @@ class DispatcherHandler:
                             f"Driver: {driver.name} ({company_name})"
                         )
                         await bot.send_message(
-                            chat_id=chat.chat_token,
-                            text=formatted_message,
-                            parse_mode="Markdown"
+                            chat_id=chat.chat_token, text=formatted_message, parse_mode="Markdown"
                         )
                         sent_count += 1
                         company_breakdown[company_name] += 1
@@ -1863,10 +1909,10 @@ class DispatcherHandler:
                 text += f"• Loads: {stat['total_loads']}\n"
                 text += f"• Unassigned Loads: {stat['unassigned_loads']}\n\n"
 
-                total_drivers += stat['total_drivers']
-                total_telegram += stat['drivers_with_telegram']
-                total_loads += stat['total_loads']
-                total_unassigned += stat['unassigned_loads']
+                total_drivers += stat["total_drivers"]
+                total_telegram += stat["drivers_with_telegram"]
+                total_loads += stat["total_loads"]
+                total_unassigned += stat["unassigned_loads"]
 
             text += "**📈 System Totals:**\n"
             text += f"• Total Drivers: {total_drivers}\n"
@@ -1925,7 +1971,7 @@ class DispatcherHandler:
         all_drivers = await load_service.get_available_drivers()
 
         # Show next batch of drivers
-        drivers_to_show = all_drivers[offset:offset + 15]
+        drivers_to_show = all_drivers[offset : offset + 15]
 
         if not drivers_to_show:
             await callback.answer("No more drivers to show!", show_alert=True)
@@ -1941,12 +1987,13 @@ class DispatcherHandler:
 
         for company_name, company_drivers in drivers_by_company.items():
             if len(drivers_by_company) > 1:
-                keyboard_buttons.append([
-                    InlineKeyboardButton(
-                        text=f"🏢 {company_name}",
-                        callback_data="company_header"
-                    )
-                ])
+                keyboard_buttons.append(
+                    [
+                        InlineKeyboardButton(
+                            text=f"🏢 {company_name}", callback_data="company_header"
+                        )
+                    ]
+                )
 
             for driver in company_drivers:
                 driver_text = f"👤 {driver.name}"
@@ -1955,12 +2002,14 @@ class DispatcherHandler:
                 if len(drivers_by_company) > 1:
                     driver_text += f" ({company_name})"
 
-                keyboard_buttons.append([
-                    InlineKeyboardButton(
-                        text=driver_text,
-                        callback_data=f"select_driver_{load_id}_{driver.id}",
-                    )
-                ])
+                keyboard_buttons.append(
+                    [
+                        InlineKeyboardButton(
+                            text=driver_text,
+                            callback_data=f"select_driver_{load_id}_{driver.id}",
+                        )
+                    ]
+                )
 
         # Add navigation buttons
         nav_buttons = []
@@ -1968,28 +2017,30 @@ class DispatcherHandler:
             nav_buttons.append(
                 InlineKeyboardButton(
                     text="⬅️ Previous",
-                    callback_data=f"show_more_drivers_{load_id}_{max(0, offset - 15)}"
+                    callback_data=f"show_more_drivers_{load_id}_{max(0, offset - 15)}",
                 )
             )
 
         if offset + 15 < len(all_drivers):
             nav_buttons.append(
                 InlineKeyboardButton(
-                    text="Next ➡️",
-                    callback_data=f"show_more_drivers_{load_id}_{offset + 15}"
+                    text="Next ➡️", callback_data=f"show_more_drivers_{load_id}_{offset + 15}"
                 )
             )
 
         if nav_buttons:
             keyboard_buttons.append(nav_buttons)
 
-        keyboard_buttons.extend([
-            [InlineKeyboardButton(
-                text="🏢 Filter by Company",
-                callback_data=f"filter_company_{load_id}"
-            )],
-            [InlineKeyboardButton(text="🔙 Back", callback_data=f"view_load_{load_id}")]
-        ])
+        keyboard_buttons.extend(
+            [
+                [
+                    InlineKeyboardButton(
+                        text="🏢 Filter by Company", callback_data=f"filter_company_{load_id}"
+                    )
+                ],
+                [InlineKeyboardButton(text="🔙 Back", callback_data=f"view_load_{load_id}")],
+            ]
+        )
 
         current_range = f"{offset + 1}-{min(offset + 15, len(all_drivers))}"
         message_text = (

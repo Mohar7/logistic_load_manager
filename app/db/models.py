@@ -193,6 +193,4 @@ class User(Base):
     # Python-side default works on every backend (SQLite tests, Postgres prod).
     # The Alembic migration also sets server_default='now()' so an out-of-band
     # INSERT (psql, raw SQL) still gets a timestamp.
-    created_at = Column(
-        DateTime, nullable=False, default=lambda: datetime.now(UTC)
-    )
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))

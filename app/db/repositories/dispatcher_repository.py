@@ -38,25 +38,17 @@ class DispatcherRepository:
             raise
 
     async def get_dispatcher_by_id(self, dispatcher_id: int) -> Dispatchers | None:
-        result = await self.db.execute(
-            select(Dispatchers).where(Dispatchers.id == dispatcher_id)
-        )
+        result = await self.db.execute(select(Dispatchers).where(Dispatchers.id == dispatcher_id))
         return result.scalar_one_or_none()
 
-    async def get_dispatcher_by_telegram_id(
-        self, telegram_id: int
-    ) -> Dispatchers | None:
+    async def get_dispatcher_by_telegram_id(self, telegram_id: int) -> Dispatchers | None:
         result = await self.db.execute(
             select(Dispatchers).where(Dispatchers.telegram_id == telegram_id)
         )
         return result.scalar_one_or_none()
 
-    async def get_dispatchers(
-        self, skip: int = 0, limit: int = 100
-    ) -> list[Dispatchers]:
-        result = await self.db.execute(
-            select(Dispatchers).offset(skip).limit(limit)
-        )
+    async def get_dispatchers(self, skip: int = 0, limit: int = 100) -> list[Dispatchers]:
+        result = await self.db.execute(select(Dispatchers).offset(skip).limit(limit))
         return list(result.scalars().all())
 
     async def update_dispatcher(

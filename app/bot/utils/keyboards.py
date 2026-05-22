@@ -21,27 +21,19 @@ class BotKeyboards:
         # Add item buttons
         for item in page_items:
             buttons.append(
-                [
-                    InlineKeyboardButton(
-                        text=item["text"], callback_data=item["callback_data"]
-                    )
-                ]
+                [InlineKeyboardButton(text=item["text"], callback_data=item["callback_data"])]
             )
 
         # Add pagination buttons if needed
         nav_buttons = []
         if current_page > 0:
             nav_buttons.append(
-                InlineKeyboardButton(
-                    text="⬅️ Previous", callback_data=f"page_{current_page - 1}"
-                )
+                InlineKeyboardButton(text="⬅️ Previous", callback_data=f"page_{current_page - 1}")
             )
 
         if end_idx < len(items):
             nav_buttons.append(
-                InlineKeyboardButton(
-                    text="Next ➡️", callback_data=f"page_{current_page + 1}"
-                )
+                InlineKeyboardButton(text="Next ➡️", callback_data=f"page_{current_page + 1}")
             )
 
         if nav_buttons:
@@ -57,12 +49,8 @@ class BotKeyboards:
         return InlineKeyboardMarkup(
             inline_keyboard=[
                 [
-                    InlineKeyboardButton(
-                        text="✅ Confirm", callback_data=confirm_callback
-                    ),
-                    InlineKeyboardButton(
-                        text="❌ Cancel", callback_data=cancel_callback
-                    ),
+                    InlineKeyboardButton(text="✅ Confirm", callback_data=confirm_callback),
+                    InlineKeyboardButton(text="❌ Cancel", callback_data=cancel_callback),
                 ]
             ]
         )

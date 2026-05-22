@@ -64,13 +64,13 @@ def get_enhanced_dispatcher_menu() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="🚛 Unassigned Loads", callback_data="unassigned_loads")],
             [
                 InlineKeyboardButton(text="👥 All Drivers", callback_data="all_drivers"),
-                InlineKeyboardButton(text="🏢 Companies", callback_data="all_companies")
+                InlineKeyboardButton(text="🏢 Companies", callback_data="all_companies"),
             ],
             [
                 InlineKeyboardButton(text="📢 Notifications", callback_data="send_notifications"),
-                InlineKeyboardButton(text="📊 Statistics", callback_data="system_stats")
+                InlineKeyboardButton(text="📊 Statistics", callback_data="system_stats"),
             ],
-            [InlineKeyboardButton(text="ℹ️ Help", callback_data="help")]
+            [InlineKeyboardButton(text="ℹ️ Help", callback_data="help")],
         ]
     )
 
@@ -80,13 +80,19 @@ def get_main_menu(user_role: str) -> InlineKeyboardMarkup:
     buttons = []
 
     if user_role == "manager":
-        buttons.extend([
-            [InlineKeyboardButton(text="💬 Manage Chats", callback_data="manage_groups")],
-            [InlineKeyboardButton(text="👤 Manage Drivers", callback_data="manage_drivers")],
-            [InlineKeyboardButton(text="👥 Manage Users", callback_data="manage_users")],
-            [InlineKeyboardButton(text="🏢 Manage Companies", callback_data="manage_companies")],
-            [InlineKeyboardButton(text="📊 View Statistics", callback_data="view_stats")],
-        ])
+        buttons.extend(
+            [
+                [InlineKeyboardButton(text="💬 Manage Chats", callback_data="manage_groups")],
+                [InlineKeyboardButton(text="👤 Manage Drivers", callback_data="manage_drivers")],
+                [InlineKeyboardButton(text="👥 Manage Users", callback_data="manage_users")],
+                [
+                    InlineKeyboardButton(
+                        text="🏢 Manage Companies", callback_data="manage_companies"
+                    )
+                ],
+                [InlineKeyboardButton(text="📊 View Statistics", callback_data="view_stats")],
+            ]
+        )
     elif user_role == "dispatcher":
         # Use enhanced dispatcher menu with cross-company access
         return get_enhanced_dispatcher_menu()
@@ -113,14 +119,21 @@ async def start_command(message: types.Message, db: AsyncSession, user_data: dic
         # New user registration
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="👤 Register as Dispatcher", callback_data="register_dispatcher")],
-                [InlineKeyboardButton(text="👑 Register as Manager", callback_data="register_manager")],
+                [
+                    InlineKeyboardButton(
+                        text="👤 Register as Dispatcher", callback_data="register_dispatcher"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text="👑 Register as Manager", callback_data="register_manager"
+                    )
+                ],
             ]
         )
 
         await message.answer(
-            "Welcome to the Logistics Bot! 🚛\n\n"
-            "To get started, please select your role:",
+            "Welcome to the Logistics Bot! 🚛\n\n" "To get started, please select your role:",
             reply_markup=keyboard,
         )
 
@@ -209,7 +222,11 @@ async def handle_name_input(message: types.Message, state: FSMContext, db: Async
                 if companies:
                     keyboard = InlineKeyboardMarkup(
                         inline_keyboard=[
-                            [InlineKeyboardButton(text=company.name, callback_data=f"company_{company.id}")]
+                            [
+                                InlineKeyboardButton(
+                                    text=company.name, callback_data=f"company_{company.id}"
+                                )
+                            ]
                             for company in companies
                         ]
                     )
@@ -217,7 +234,7 @@ async def handle_name_input(message: types.Message, state: FSMContext, db: Async
                     await state.set_state(RegistrationStates.waiting_for_company_selection)
                     await message.answer(
                         "Please select your primary company (for reference - you'll have access to all companies):",
-                        reply_markup=keyboard
+                        reply_markup=keyboard,
                     )
                 else:
                     await message.answer(
@@ -233,13 +250,13 @@ async def handle_name_input(message: types.Message, state: FSMContext, db: Async
 
     except Exception as e:
         logger.error(f"Registration error: {e}")
-        await message.answer(
-            "❌ An error occurred during registration. Please try again later."
-        )
+        await message.answer("❌ An error occurred during registration. Please try again later.")
         await state.clear()
 
 
-@dp.callback_query(F.data.startswith("company_"), StateFilter(RegistrationStates.waiting_for_company_selection))
+@dp.callback_query(
+    F.data.startswith("company_"), StateFilter(RegistrationStates.waiting_for_company_selection)
+)
 async def handle_company_selection(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
     """Handle company selection during dispatcher registration"""
     company_id = int(callback.data.split("_")[1])
@@ -259,14 +276,16 @@ async def handle_company_selection(callback: CallbackQuery, state: FSMContext, d
                 "✅ Registration completed successfully!\n\n"
                 "You now have **cross-company access** to all loads and drivers in the system.\n"
                 "Use /start to begin managing loads across all companies.",
-                parse_mode="Markdown"
+                parse_mode="Markdown",
             )
         else:
             await callback.message.edit_text("❌ Registration failed. Please try again later.")
 
     except Exception as e:
         logger.error(f"Company selection error: {e}")
-        await callback.message.edit_text("❌ An error occurred during registration. Please try again later.")
+        await callback.message.edit_text(
+            "❌ An error occurred during registration. Please try again later."
+        )
 
     await state.clear()
     await callback.answer()
@@ -349,12 +368,18 @@ async def handle_manage_groups(callback: CallbackQuery, user_data: dict):
         inline_keyboard=[
             [InlineKeyboardButton(text="➕ Add Chat", callback_data="add_group")],
             [InlineKeyboardButton(text="📋 List Chats", callback_data="list_groups")],
-            [InlineKeyboardButton(text="🔗 Assign Chat to Driver", callback_data="assign_chat_to_driver")],
+            [
+                InlineKeyboardButton(
+                    text="🔗 Assign Chat to Driver", callback_data="assign_chat_to_driver"
+                )
+            ],
             [InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")],
         ]
     )
 
-    await callback.message.edit_text("💬 Chat Management\n\nChoose an action:", reply_markup=keyboard)
+    await callback.message.edit_text(
+        "💬 Chat Management\n\nChoose an action:", reply_markup=keyboard
+    )
     await callback.answer()
 
 
@@ -408,7 +433,9 @@ async def handle_manage_users(callback: CallbackQuery, user_data: dict, db: Asyn
         await callback.message.edit_text(
             text,
             reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[[InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")]]
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")]
+                ]
             ),
             parse_mode="Markdown",
         )
@@ -417,7 +444,9 @@ async def handle_manage_users(callback: CallbackQuery, user_data: dict, db: Asyn
         await callback.message.edit_text(
             "❌ Error retrieving users.",
             reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[[InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")]]
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")]
+                ]
             ),
         )
 
@@ -450,7 +479,9 @@ async def handle_manage_companies(callback: CallbackQuery, user_data: dict, db: 
         await callback.message.edit_text(
             text,
             reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[[InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")]]
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")]
+                ]
             ),
             parse_mode="Markdown",
         )
@@ -459,7 +490,9 @@ async def handle_manage_companies(callback: CallbackQuery, user_data: dict, db: 
         await callback.message.edit_text(
             "❌ Error retrieving companies.",
             reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[[InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")]]
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="🔙 Back", callback_data="back_to_menu")]
+                ]
             ),
         )
 
@@ -478,68 +511,88 @@ async def handle_stats_callback(callback: CallbackQuery, db: AsyncSession, user_
 
 # ===================== UNIFIED MANAGEMENT HANDLERS =====================
 
+
 # Chat Management Handlers
 @dp.callback_query(F.data == "add_group")
 async def handle_add_group(callback: CallbackQuery, state: FSMContext, user_data: dict):
     await UnifiedManagementHandler.handle_add_group_menu(callback, state, user_data)
 
+
 @dp.callback_query(F.data == "add_by_username")
 async def handle_add_by_username(callback: CallbackQuery, state: FSMContext):
     await UnifiedManagementHandler.handle_add_by_username(callback, state)
+
 
 @dp.callback_query(F.data == "add_by_chat_id")
 async def handle_add_by_chat_id(callback: CallbackQuery, state: FSMContext):
     await UnifiedManagementHandler.handle_add_by_chat_id(callback, state)
 
+
 @dp.callback_query(F.data == "add_by_forward")
 async def handle_add_by_forward(callback: CallbackQuery, state: FSMContext):
     await UnifiedManagementHandler.handle_add_by_forward(callback, state)
+
 
 @dp.callback_query(F.data == "confirm_add_chat")
 async def handle_confirm_add_chat(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
     await UnifiedManagementHandler.handle_confirm_add_chat(callback, state, db)
 
+
 @dp.callback_query(F.data == "cancel_add_chat")
 async def handle_cancel_add_chat(callback: CallbackQuery, state: FSMContext):
     await UnifiedManagementHandler.handle_cancel_add_chat(callback, state)
 
+
 @dp.callback_query(F.data == "list_groups")
 async def handle_list_groups(callback: CallbackQuery, db: AsyncSession, user_data: dict):
     await UnifiedManagementHandler.handle_list_groups(callback, db, user_data)
+
 
 # Driver Management Handlers
 @dp.callback_query(F.data == "add_driver")
 async def handle_add_driver(callback: CallbackQuery, state: FSMContext):
     await UnifiedManagementHandler.handle_add_driver(callback, state)
 
+
 @dp.callback_query(F.data.startswith("select_company_"))
-async def handle_company_selection_for_driver(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
+async def handle_company_selection_for_driver(
+    callback: CallbackQuery, state: FSMContext, db: AsyncSession
+):
     await UnifiedManagementHandler.handle_company_selection(callback, state, db)
 
+
 @dp.callback_query(F.data == "confirm_create_driver")
-async def handle_confirm_create_driver(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
+async def handle_confirm_create_driver(
+    callback: CallbackQuery, state: FSMContext, db: AsyncSession
+):
     await UnifiedManagementHandler.handle_confirm_create_driver(callback, state, db)
+
 
 @dp.callback_query(F.data == "cancel_add_driver")
 async def handle_cancel_add_driver(callback: CallbackQuery, state: FSMContext):
     await UnifiedManagementHandler.handle_cancel_add_driver(callback, state)
 
+
 @dp.callback_query(F.data == "list_drivers")
 async def handle_list_drivers(callback: CallbackQuery, db: AsyncSession):
     await UnifiedManagementHandler.handle_list_drivers(callback, db)
+
 
 # Driver-Chat Assignment Handlers
 @dp.callback_query(F.data == "assign_driver_to_chat")
 async def handle_assign_driver_to_chat(callback: CallbackQuery, db: AsyncSession):
     await UnifiedManagementHandler.handle_assign_driver_to_chat(callback, db)
 
+
 @dp.callback_query(F.data.startswith("select_driver_for_chat_"))
 async def handle_select_driver_for_chat(callback: CallbackQuery, db: AsyncSession):
     await UnifiedManagementHandler.handle_select_driver_for_chat(callback, db)
 
+
 @dp.callback_query(F.data.startswith("confirm_assign_chat_"))
 async def handle_confirm_assign_chat(callback: CallbackQuery, db: AsyncSession):
     await UnifiedManagementHandler.handle_confirm_assign_chat(callback, db)
+
 
 @dp.callback_query(F.data.startswith("assign_chat_to_driver_"))
 async def handle_assign_chat_to_specific_driver(callback: CallbackQuery, db: AsyncSession):
@@ -549,18 +602,22 @@ async def handle_assign_chat_to_specific_driver(callback: CallbackQuery, db: Asy
     callback.data = f"select_driver_for_chat_{driver_id}"
     await UnifiedManagementHandler.handle_select_driver_for_chat(callback, db)
 
+
 # Message handlers for management states
 @dp.message(StateFilter(ManagementStates.waiting_for_username))
 async def handle_username_message(message: types.Message, state: FSMContext, db: AsyncSession):
     await UnifiedManagementHandler.handle_username_input(message, state, db)
 
+
 @dp.message(StateFilter(ManagementStates.waiting_for_chat_id))
 async def handle_chat_id_message(message: types.Message, state: FSMContext, db: AsyncSession):
     await UnifiedManagementHandler.handle_chat_id_input(message, state, db)
 
+
 @dp.message(StateFilter(ManagementStates.waiting_for_forward))
 async def handle_forward_message_input(message: types.Message, state: FSMContext, db: AsyncSession):
     await UnifiedManagementHandler.handle_forward_message(message, state, db)
+
 
 @dp.message(StateFilter(ManagementStates.waiting_for_driver_name))
 async def handle_driver_name_message(message: types.Message, state: FSMContext, db: AsyncSession):
@@ -574,29 +631,36 @@ async def handle_driver_name_message(message: types.Message, state: FSMContext, 
 async def handle_all_loads(callback: CallbackQuery, db: AsyncSession, user_data: dict):
     await DispatcherHandler.handle_all_loads(callback, db, user_data)
 
+
 @dp.callback_query(F.data == "unassigned_loads")
 async def handle_unassigned_loads(callback: CallbackQuery, db: AsyncSession, user_data: dict):
     await DispatcherHandler.handle_unassigned_loads(callback, db, user_data)
+
 
 @dp.callback_query(F.data == "all_drivers")
 async def handle_all_drivers(callback: CallbackQuery, db: AsyncSession, user_data: dict):
     await DispatcherHandler.handle_all_drivers(callback, db, user_data)
 
+
 @dp.callback_query(F.data == "all_companies")
 async def handle_all_companies(callback: CallbackQuery, db: AsyncSession, user_data: dict):
     await DispatcherHandler.handle_all_companies(callback, db, user_data)
+
 
 @dp.callback_query(F.data.startswith("company_details_"))
 async def handle_company_details(callback: CallbackQuery, db: AsyncSession):
     await DispatcherHandler.handle_company_details(callback, db)
 
+
 @dp.callback_query(F.data == "system_stats")
 async def handle_system_stats(callback: CallbackQuery, db: AsyncSession, user_data: dict):
     await DispatcherHandler.handle_system_stats(callback, db, user_data)
 
+
 @dp.callback_query(F.data == "send_notifications")
 async def handle_send_notifications(callback: CallbackQuery, user_data: dict):
     await DispatcherHandler.handle_send_notifications(callback, user_data)
+
 
 @dp.callback_query(F.data == "send_to_driver")
 async def handle_send_to_driver(callback: CallbackQuery, user_data: dict, db: AsyncSession):
@@ -610,52 +674,68 @@ async def handle_send_to_driver(callback: CallbackQuery, user_data: dict, db: As
 async def handle_view_load(callback: CallbackQuery, db: AsyncSession):
     await DispatcherHandler.handle_load_details(callback, db)
 
+
 @dp.callback_query(F.data.startswith("assign_driver_"))
 async def handle_assign_driver_callback(callback: CallbackQuery, db: AsyncSession):
     await DispatcherHandler.handle_assign_driver(callback, db)
+
 
 @dp.callback_query(F.data.startswith("filter_company_"))
 async def handle_filter_company_callback(callback: CallbackQuery, db: AsyncSession):
     await DispatcherHandler.handle_filter_by_company(callback, db)
 
+
 @dp.callback_query(F.data.startswith("company_drivers_"))
 async def handle_company_drivers_callback(callback: CallbackQuery, db: AsyncSession):
     await DispatcherHandler.handle_company_drivers(callback, db)
+
 
 @dp.callback_query(F.data.startswith("show_more_drivers_"))
 async def handle_show_more_drivers_callback(callback: CallbackQuery, db: AsyncSession):
     await DispatcherHandler.handle_show_more_drivers(callback, db)
 
+
 @dp.callback_query(F.data.startswith("select_driver_"))
 async def handle_select_driver(callback: CallbackQuery, db: AsyncSession):
     await DispatcherHandler.handle_driver_selection(callback, db)
+
 
 @dp.callback_query(F.data.startswith("notify_driver_"))
 async def handle_notify_driver_callback(callback: CallbackQuery, db: AsyncSession):
     await DispatcherHandler.handle_notify_driver(callback, db)
 
+
 @dp.callback_query(F.data == "broadcast_message")
 async def handle_broadcast_callback(callback: CallbackQuery, state: FSMContext):
     await DispatcherHandler.handle_broadcast_message(callback, state)
+
 
 @dp.callback_query(F.data == "broadcast_all_drivers")
 async def handle_broadcast_all_drivers_callback(callback: CallbackQuery, state: FSMContext):
     await DispatcherHandler.handle_broadcast_all_drivers(callback, state)
 
+
 @dp.callback_query(F.data == "broadcast_by_company")
-async def handle_broadcast_by_company_callback(callback: CallbackQuery, state: FSMContext, db: AsyncSession):
+async def handle_broadcast_by_company_callback(
+    callback: CallbackQuery, state: FSMContext, db: AsyncSession
+):
     await DispatcherHandler.handle_broadcast_by_company(callback, state, db)
+
 
 @dp.callback_query(F.data == "broadcast_telegram_only")
 async def handle_broadcast_telegram_only_callback(callback: CallbackQuery, state: FSMContext):
     await DispatcherHandler.handle_broadcast_telegram_only(callback, state)
 
+
 @dp.callback_query(F.data.startswith("broadcast_company_"))
 async def handle_broadcast_company_callback(callback: CallbackQuery, state: FSMContext):
     await DispatcherHandler.handle_company_broadcast_selection(callback, state)
 
+
 @dp.message(StateFilter(NotificationStates.waiting_for_message))
-async def handle_broadcast_input(message: types.Message, state: FSMContext, db: AsyncSession, user_data: dict):
+async def handle_broadcast_input(
+    message: types.Message, state: FSMContext, db: AsyncSession, user_data: dict
+):
     await DispatcherHandler.handle_broadcast_message_input(message, state, db, user_data)
 
 
@@ -690,7 +770,11 @@ async def error_handler(event, exception_info):
                 "❌ An error occurred\n\n"
                 "Something went wrong. Please try again or use /start to return to the main menu."
             )
-        elif hasattr(event, "callback_query") and event.callback_query and event.callback_query.message:
+        elif (
+            hasattr(event, "callback_query")
+            and event.callback_query
+            and event.callback_query.message
+        ):
             await event.callback_query.message.edit_text(
                 "❌ An error occurred\n\n"
                 "Something went wrong. Please try again or use /start to return to the main menu."
@@ -815,7 +899,6 @@ async def test_integrations():
 # ===================== MAIN EXECUTION =====================
 
 if __name__ == "__main__":
-
     # Setup logging
     setup_logging()
 

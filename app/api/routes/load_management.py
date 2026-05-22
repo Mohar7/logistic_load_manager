@@ -55,9 +55,7 @@ async def assign_driver_to_load(
     driver = await driver_repo.get_driver_by_id(driver_id)
 
     if not driver:
-        raise HTTPException(
-            status_code=404, detail=f"Driver with ID {driver_id} not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Driver with ID {driver_id} not found")
 
     # Update the load with the driver
     load = load_data["load"]
@@ -130,9 +128,7 @@ async def get_assigned_drivers(db: AsyncSession = Depends(get_db)):
         List[DriverResponse]: List of drivers with load assignments
     """
     # Drivers joined to loads they're assigned on
-    result = await db.execute(
-        select(Driver).join(Load, Load.driver_id == Driver.id).distinct()
-    )
+    result = await db.execute(select(Driver).join(Load, Load.driver_id == Driver.id).distinct())
     drivers = list(result.scalars().all())
 
     response = []

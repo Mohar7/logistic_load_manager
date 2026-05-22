@@ -70,9 +70,7 @@ async def get_driver(driver_id: int, db: AsyncSession = Depends(get_db)):
     result = await driver_service.get_driver_by_id(driver_id)
 
     if not result:
-        raise HTTPException(
-            status_code=404, detail=f"Driver with ID {driver_id} not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Driver with ID {driver_id} not found")
 
     driver_data = result["driver"]
     return {
@@ -161,9 +159,7 @@ async def update_driver(
         )
 
         if not result:
-            raise HTTPException(
-                status_code=404, detail=f"Driver with ID {driver_id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Driver with ID {driver_id} not found")
 
         driver_data = result["driver"]
         return {
@@ -195,8 +191,6 @@ async def delete_driver(driver_id: int, db: AsyncSession = Depends(get_db)):
     result = await driver_service.delete_driver(driver_id)
 
     if not result:
-        raise HTTPException(
-            status_code=404, detail=f"Driver with ID {driver_id} not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Driver with ID {driver_id} not found")
 
     return {"message": f"Driver with ID {driver_id} successfully deleted"}

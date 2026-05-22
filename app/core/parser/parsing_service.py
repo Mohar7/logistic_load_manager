@@ -1,4 +1,5 @@
 # app/core/parser/parsing_service.py
+import contextlib
 import logging
 from datetime import datetime
 from decimal import Decimal
@@ -6,9 +7,6 @@ from typing import Any
 
 from fastapi import Body
 
-from app.schemas.load import Leg, Trip
-
-logger = logging.getLogger(__name__)
 from app.core.parser.regex_patterns import (
     ADDRESS_PATTERN,
     DISTANCE_PATTERN,
@@ -25,6 +23,9 @@ from app.core.parser.regex_patterns import (
 )
 from app.core.utils.date_utils import parse_datetime_with_tz
 from app.core.utils.text_utils import find_all, find_first, parse_decimal
+from app.schemas.load import Leg, Trip
+
+logger = logging.getLogger(__name__)
 
 
 class ParsingService:
@@ -126,9 +127,7 @@ class ParsingService:
 
         addresses = find_all(ADDRESS_PATTERN, leg_text)
         pick_up_address = addresses[0].split("\n")[-1].strip() if addresses else None
-        drop_off_address = (
-            addresses[1].split("\n")[-1].strip() if len(addresses) > 1 else None
-        )
+        drop_off_address = addresses[1].split("\n")[-1].strip() if len(addresses) > 1 else None
 
         driver = find_first(DRIVER_PATTERN, leg_text, group=1)
         assigned_driver = driver.strip() if driver else None
@@ -151,7 +150,7 @@ class ParsingService:
         )
 
     def parse(
-        self, input_text: str = None, dispatcher_id: int | None = None
+        self, input_text: str | None = None, dispatcher_id: int | None = None
     ) -> dict[str, Any]:
         """
         Main method for parsing text.
@@ -168,18 +167,15 @@ class ParsingService:
             logger.error("No text provided for parsing.")
             return None
 
-        load_text = self.text if not input_text else input_text
+        load_text = input_text if input_text else self.text
         leg_ids = find_all(LEG_ID_PATTERN, load_text)
 
         # Determine the split point between trip info and leg blocks
         split_point = -1
         if len(leg_ids) > 1:
-            # Find the second occurrence of leg_id
-            try:
-                # Find the start index of the second leg_id
+            # Find the start index of the second leg_id; if absent, stay -1.
+            with contextlib.suppress(ValueError):
                 split_point = load_text[5:].index(leg_ids[1]) + 5
-            except ValueError:
-                pass  # Second occurrence not found
 
         # If second leg_id occurrence not found, look for "Assign driver" as fallback
         if split_point == -1:

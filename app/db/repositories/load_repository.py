@@ -85,9 +85,7 @@ class LoadRepository:
             logger.error(f"Error creating load: {e!s}")
             raise
 
-    async def update_load(
-        self, load_id: int, update_data: dict[str, Any]
-    ) -> Load | None:
+    async def update_load(self, load_id: int, update_data: dict[str, Any]) -> Load | None:
         """
         Update an existing load.
 
@@ -108,21 +106,14 @@ class LoadRepository:
             # Handle facility updates if addresses are provided
             if "pick_up_facility_id" in update_data or "pick_up_address" in update_data:
                 pickup_facility = await self._get_or_create_facility(
-                    update_data.get(
-                        "pick_up_facility_id", db_load.pickup_facility_name
-                    ),
+                    update_data.get("pick_up_facility_id", db_load.pickup_facility_name),
                     update_data.get("pick_up_address", db_load.pickup_address),
                 )
                 update_data["pickup_facility_id"] = pickup_facility.id
 
-            if (
-                "drop_off_facility_id" in update_data
-                or "drop_off_address" in update_data
-            ):
+            if "drop_off_facility_id" in update_data or "drop_off_address" in update_data:
                 dropoff_facility = await self._get_or_create_facility(
-                    update_data.get(
-                        "drop_off_facility_id", db_load.dropoff_facility_name
-                    ),
+                    update_data.get("drop_off_facility_id", db_load.dropoff_facility_name),
                     update_data.get("drop_off_address", db_load.dropoff_address),
                 )
                 update_data["dropoff_facility_id"] = dropoff_facility.id
@@ -132,9 +123,7 @@ class LoadRepository:
                 driver_id = None
                 if update_data["assigned_driver"]:
                     result = await self.db.execute(
-                        select(Driver).where(
-                            Driver.name == update_data["assigned_driver"]
-                        )
+                        select(Driver).where(Driver.name == update_data["assigned_driver"])
                     )
                     driver = result.scalar_one_or_none()
                     if driver:
@@ -233,9 +222,7 @@ class LoadRepository:
             logger.error(f"Error creating leg: {e!s}")
             raise
 
-    async def update_leg(
-        self, leg_id: int, update_data: dict[str, Any]
-    ) -> Leg | None:
+    async def update_leg(self, leg_id: int, update_data: dict[str, Any]) -> Leg | None:
         """
         Update an existing leg.
 
@@ -262,14 +249,9 @@ class LoadRepository:
                 update_data["pickup_facility_id"] = pickup_facility.id
                 update_data["pickup_facility_name"] = pickup_facility.name
 
-            if (
-                "drop_off_facility_id" in update_data
-                or "drop_off_address" in update_data
-            ):
+            if "drop_off_facility_id" in update_data or "drop_off_address" in update_data:
                 dropoff_facility = await self._get_or_create_facility(
-                    update_data.get(
-                        "drop_off_facility_id", db_leg.dropoff_facility_name
-                    ),
+                    update_data.get("drop_off_facility_id", db_leg.dropoff_facility_name),
                     update_data.get("drop_off_address", db_leg.dropoff_address),
                 )
                 update_data["dropoff_facility_id"] = dropoff_facility.id
@@ -301,9 +283,7 @@ class LoadRepository:
             int: Number of legs deleted
         """
         try:
-            result = await self.db.execute(
-                delete(Leg).where(Leg.load_id == load_id)
-            )
+            result = await self.db.execute(delete(Leg).where(Leg.load_id == load_id))
             await self.db.commit()
             return result.rowcount or 0
 
@@ -381,9 +361,7 @@ class LoadRepository:
         return result.scalar_one_or_none()
 
     async def get_loads_by_dispatcher_id(self, dispatcher_id: int) -> list[Load]:
-        result = await self.db.execute(
-            select(Load).where(Load.dispatcher_id == dispatcher_id)
-        )
+        result = await self.db.execute(select(Load).where(Load.dispatcher_id == dispatcher_id))
         return list(result.scalars().all())
 
     async def get_loads(self, skip: int = 0, limit: int = 100) -> list[Load]:
@@ -434,9 +412,7 @@ class LoadRepository:
         result = await self.db.execute(select(Leg).where(Leg.id == leg_id))
         return result.scalar_one_or_none()
 
-    async def _get_or_create_facility(
-        self, facility_id: str, location: str
-    ) -> Facility:
+    async def _get_or_create_facility(self, facility_id: str, location: str) -> Facility:
         """
         Get a facility by ID or create it if it doesn't exist.
 
@@ -448,9 +424,7 @@ class LoadRepository:
             Facility: Found or created facility
         """
         # Try to find by name first
-        result = await self.db.execute(
-            select(Facility).where(Facility.name == facility_id)
-        )
+        result = await self.db.execute(select(Facility).where(Facility.name == facility_id))
         facility = result.scalar_one_or_none()
 
         if not facility:
@@ -464,9 +438,7 @@ class LoadRepository:
                 await self.db.rollback()
                 logger.error(f"Error creating facility: {e!s}")
                 # Try again in case another process created it concurrently
-                result = await self.db.execute(
-                    select(Facility).where(Facility.name == facility_id)
-                )
+                result = await self.db.execute(select(Facility).where(Facility.name == facility_id))
                 facility = result.scalar_one_or_none()
                 if not facility:
                     # If still not found, create a default facility
@@ -498,14 +470,10 @@ class LoadRepository:
             await self.db.refresh(company)
         return company
 
-    async def update_dispatcher_for_the_load(
-        self, load_id: int, dispatcher_id: int
-    ) -> None:
+    async def update_dispatcher_for_the_load(self, load_id: int, dispatcher_id: int) -> None:
         try:
             await self.db.execute(
-                update(Load)
-                .where(Load.id == load_id)
-                .values(dispatcher_id=dispatcher_id)
+                update(Load).where(Load.id == load_id).values(dispatcher_id=dispatcher_id)
             )
             await self.db.commit()
         except SQLAlchemyError as e:

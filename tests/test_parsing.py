@@ -11,8 +11,6 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-import pytest
-
 from app.core.parser.parsing_service import ParsingService
 
 # A realistic load text the parser is designed to handle. Fields are

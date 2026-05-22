@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import os
 from collections.abc import AsyncGenerator
-from typing import Any
 
 import pytest
 import pytest_asyncio
@@ -26,7 +25,6 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-
 
 # Ensure config loads cleanly even without a real DB or telegram token.
 os.environ.setdefault("DB_HOST", "ignored")
@@ -40,10 +38,10 @@ os.environ.setdefault("DEBUG", "True")
 
 
 # Import AFTER env stubs so config.get_settings() picks them up.
-from app.auth.security import hash_password  # noqa: E402
-from app.db.database import Base, get_db  # noqa: E402
-from app.db.models import User  # noqa: E402
-from app.main import app  # noqa: E402
+from app.auth.security import hash_password
+from app.db.database import Base, get_db
+from app.db.models import User
+from app.main import app
 
 
 # Skip the real Alembic startup so SQLite tests don't try to connect to PG.
@@ -101,9 +99,7 @@ async def client(
 
     async with LifespanManager(app):
         transport = ASGITransport(app=app)
-        async with AsyncClient(
-            transport=transport, base_url="http://testserver"
-        ) as ac:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
             yield ac
 
     app.dependency_overrides.clear()
@@ -129,9 +125,7 @@ async def _seed_user(
 
 @pytest_asyncio.fixture
 async def admin_user(db_session: AsyncSession) -> User:
-    return await _seed_user(
-        db_session, username="admin", password="admin-pw-123", role="admin"
-    )
+    return await _seed_user(db_session, username="admin", password="admin-pw-123", role="admin")
 
 
 @pytest_asyncio.fixture
@@ -143,9 +137,7 @@ async def dispatcher_user(db_session: AsyncSession) -> User:
 
 @pytest_asyncio.fixture
 async def viewer_user(db_session: AsyncSession) -> User:
-    return await _seed_user(
-        db_session, username="viewer", password="view-pw-123", role="viewer"
-    )
+    return await _seed_user(db_session, username="viewer", password="view-pw-123", role="viewer")
 
 
 async def _login(client: AsyncClient, username: str, password: str) -> str:

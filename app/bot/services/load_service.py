@@ -119,7 +119,9 @@ class LoadBotService:
             )
             drivers = list(result.scalars().all())
 
-            logger.info(f"Retrieved {len(drivers)} drivers from all companies for cross-company access")
+            logger.info(
+                f"Retrieved {len(drivers)} drivers from all companies for cross-company access"
+            )
             return drivers
         except SQLAlchemyError as e:
             logger.error(f"Error getting available drivers: {e}")
@@ -142,9 +144,7 @@ class LoadBotService:
     async def get_all_companies(self) -> list[Company]:
         """Get all companies - accessible to all dispatchers"""
         try:
-            result = await self.db.execute(
-                select(Company).order_by(Company.name)
-            )
+            result = await self.db.execute(select(Company).order_by(Company.name))
             companies = list(result.scalars().all())
             logger.info(f"Retrieved {len(companies)} companies for cross-company access")
             return companies
@@ -165,14 +165,18 @@ class LoadBotService:
 
             result_list = []
             for driver in drivers:
-                result_list.append({
-                    "driver": driver,
-                    "company_name": driver.company.name if driver.company else "No Company",
-                    "company_id": driver.company_id,
-                    "has_telegram": driver.chat_id is not None
-                })
+                result_list.append(
+                    {
+                        "driver": driver,
+                        "company_name": driver.company.name if driver.company else "No Company",
+                        "company_id": driver.company_id,
+                        "has_telegram": driver.chat_id is not None,
+                    }
+                )
 
-            logger.info(f"Retrieved {len(result_list)} drivers with company info for cross-company access")
+            logger.info(
+                f"Retrieved {len(result_list)} drivers with company info for cross-company access"
+            )
             return result_list
         except SQLAlchemyError as e:
             logger.error(f"Error getting drivers with company info: {e}")
@@ -183,10 +187,7 @@ class LoadBotService:
         try:
             all_drivers = await self.get_available_drivers()
 
-            result = {
-                "with_telegram": [],
-                "without_telegram": []
-            }
+            result = {"with_telegram": [], "without_telegram": []}
 
             for driver in all_drivers:
                 if driver.chat_id:
@@ -194,7 +195,9 @@ class LoadBotService:
                 else:
                     result["without_telegram"].append(driver)
 
-            logger.info(f"Grouped drivers: {len(result['with_telegram'])} with Telegram, {len(result['without_telegram'])} without")
+            logger.info(
+                f"Grouped drivers: {len(result['with_telegram'])} with Telegram, {len(result['without_telegram'])} without"
+            )
             return result
         except Exception as e:
             logger.error(f"Error grouping drivers by Telegram availability: {e}")
@@ -213,13 +216,15 @@ class LoadBotService:
                 drivers_with_telegram = sum(1 for d in company_drivers if d.chat_id)
                 unassigned_loads = sum(1 for l in company_loads if not l.driver_id)
 
-                stats.append({
-                    "company": company,
-                    "total_drivers": len(company_drivers),
-                    "drivers_with_telegram": drivers_with_telegram,
-                    "total_loads": len(company_loads),
-                    "unassigned_loads": unassigned_loads
-                })
+                stats.append(
+                    {
+                        "company": company,
+                        "total_drivers": len(company_drivers),
+                        "drivers_with_telegram": drivers_with_telegram,
+                        "total_loads": len(company_loads),
+                        "unassigned_loads": unassigned_loads,
+                    }
+                )
 
             return stats
         except Exception as e:
@@ -230,9 +235,7 @@ class LoadBotService:
         """Assign any driver to any load - cross-company assignment"""
         try:
             load = (
-                await self.db.execute(
-                    select(Load).where(Load.id == load_id)
-                )
+                await self.db.execute(select(Load).where(Load.id == load_id))
             ).scalar_one_or_none()
             driver = (
                 await self.db.execute(
@@ -249,7 +252,9 @@ class LoadBotService:
             load.assigned_driver = driver.name
             await self.db.commit()
 
-            logger.info(f"Cross-company assignment: Driver {driver.name} from {driver.company.name if driver.company else 'No Company'} assigned to load {load.trip_id}")
+            logger.info(
+                f"Cross-company assignment: Driver {driver.name} from {driver.company.name if driver.company else 'No Company'} assigned to load {load.trip_id}"
+            )
             return True
         except Exception as e:
             logger.error(f"Error assigning driver to load: {e}")
@@ -260,9 +265,7 @@ class LoadBotService:
         """Get driver suggestions for a load, including cross-company options"""
         try:
             load = (
-                await self.db.execute(
-                    select(Load).where(Load.id == load_id)
-                )
+                await self.db.execute(select(Load).where(Load.id == load_id))
             ).scalar_one_or_none()
             if not load:
                 return []
@@ -284,12 +287,16 @@ class LoadBotService:
 
             suggestions = []
             for driver in available_drivers:
-                suggestions.append({
-                    "driver": driver,
-                    "company_name": driver.company.name if driver.company else "No Company",
-                    "has_telegram": driver.chat_id is not None,
-                    "cross_company": driver.company_id != load.company_id if load.company_id else False
-                })
+                suggestions.append(
+                    {
+                        "driver": driver,
+                        "company_name": driver.company.name if driver.company else "No Company",
+                        "has_telegram": driver.chat_id is not None,
+                        "cross_company": driver.company_id != load.company_id
+                        if load.company_id
+                        else False,
+                    }
+                )
 
             return suggestions
         except Exception as e:
@@ -299,23 +306,37 @@ class LoadBotService:
     async def get_system_wide_statistics(self) -> dict[str, Any]:
         """Get comprehensive system statistics"""
         try:
-            total_loads = (await self.db.execute(select(func.count()).select_from(Load))).scalar_one()
-            assigned_loads = (await self.db.execute(
-                select(func.count()).select_from(Load).where(Load.driver_id.isnot(None))
-            )).scalar_one()
-            unassigned_loads = (await self.db.execute(
-                select(func.count()).select_from(Load).where(Load.driver_id.is_(None))
-            )).scalar_one()
-            total_drivers = (await self.db.execute(select(func.count()).select_from(Driver))).scalar_one()
-            telegram_drivers = (await self.db.execute(
-                select(func.count()).select_from(Driver).where(Driver.chat_id.isnot(None))
-            )).scalar_one()
-            total_companies = (await self.db.execute(select(func.count()).select_from(Company))).scalar_one()
-            active_companies = (await self.db.execute(
-                select(func.count(func.distinct(Company.id)))
-                .select_from(Company)
-                .join(Driver, Driver.company_id == Company.id)
-            )).scalar_one()
+            total_loads = (
+                await self.db.execute(select(func.count()).select_from(Load))
+            ).scalar_one()
+            assigned_loads = (
+                await self.db.execute(
+                    select(func.count()).select_from(Load).where(Load.driver_id.isnot(None))
+                )
+            ).scalar_one()
+            unassigned_loads = (
+                await self.db.execute(
+                    select(func.count()).select_from(Load).where(Load.driver_id.is_(None))
+                )
+            ).scalar_one()
+            total_drivers = (
+                await self.db.execute(select(func.count()).select_from(Driver))
+            ).scalar_one()
+            telegram_drivers = (
+                await self.db.execute(
+                    select(func.count()).select_from(Driver).where(Driver.chat_id.isnot(None))
+                )
+            ).scalar_one()
+            total_companies = (
+                await self.db.execute(select(func.count()).select_from(Company))
+            ).scalar_one()
+            active_companies = (
+                await self.db.execute(
+                    select(func.count(func.distinct(Company.id)))
+                    .select_from(Company)
+                    .join(Driver, Driver.company_id == Company.id)
+                )
+            ).scalar_one()
 
             stats = {
                 "loads": {
@@ -333,8 +354,8 @@ class LoadBotService:
                 },
                 "cross_company": {
                     "enabled": True,
-                    "assignments": 0  # Could be calculated if tracking cross-company assignments
-                }
+                    "assignments": 0,  # Could be calculated if tracking cross-company assignments
+                },
             }
 
             logger.info("Generated system-wide statistics")
