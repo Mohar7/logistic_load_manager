@@ -1,13 +1,18 @@
 # app/api/routes/bot_management.py
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlalchemy.orm import Session
-from typing import List, Optional, Dict, Any
-from app.db.database import get_db
-from app.bot.services.user_service import UserService
-from app.bot.services.chat_service import ChatService
-from app.services.notification_service import NotificationService
-from app.db.models import TelegramChat, Dispatchers
+import logging
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from app.bot.services.chat_service import ChatService
+from app.bot.services.user_service import UserService
+from app.db.database import get_db
+from app.db.models import Dispatchers, TelegramChat
+from app.services.notification_service import NotificationService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/bot",
@@ -241,9 +246,11 @@ async def send_notification(
                             text=f"📢 System Notification:\n\n{notification.message}",
                         )
                         sent_count += 1
-                    except Exception as e:
+                    except Exception:
                         failed_count += 1
-                        print(f"Failed to send to chat {chat.group_name}: {e}")
+                        logger.exception(
+                            "Failed to send to chat %s", chat.group_name
+                        )
 
             elif notification.target_type == "drivers":
                 # Send to all drivers
@@ -261,9 +268,11 @@ async def send_notification(
                                 text=f"👤 Message for {driver.name}:\n\n{notification.message}",
                             )
                             sent_count += 1
-                    except Exception as e:
+                    except Exception:
                         failed_count += 1
-                        print(f"Failed to send to driver {driver.name}: {e}")
+                        logger.exception(
+                            "Failed to send to driver %s", driver.name
+                        )
 
             elif notification.target_type == "specific_chat" and notification.target_id:
                 # Send to specific chat
@@ -272,15 +281,21 @@ async def send_notification(
                         chat_id=notification.target_id, text=notification.message
                     )
                     sent_count = 1
-                except Exception as e:
+                except Exception:
                     failed_count = 1
-                    print(f"Failed to send to chat {notification.target_id}: {e}")
+                    logger.exception(
+                        "Failed to send to chat %s", notification.target_id
+                    )
 
             await bot.session.close()
-            print(f"Notification sent - Success: {sent_count}, Failed: {failed_count}")
+            logger.info(
+                "Notification sent - Success: %d, Failed: %d",
+                sent_count,
+                failed_count,
+            )
 
-        except Exception as e:
-            print(f"Error in notification task: {e}")
+        except Exception:
+            logger.exception("Error in notification task")
 
     background_tasks.add_task(send_notification_task)
 
@@ -298,7 +313,7 @@ async def notify_load_assignment(
         success = await notification_service.notify_driver_about_load(
             load_id, driver_id
         )
-        print(f"Load notification sent: {success}")
+        logger.info("Load notification sent: %s", success)
 
     await notify_task()
 

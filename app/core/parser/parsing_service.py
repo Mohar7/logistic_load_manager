@@ -1,11 +1,16 @@
 # app/core/parser/parsing_service.py
-import re
 import json
+import logging
+import re
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from fastapi import Body, Depends
 from decimal import Decimal
-from app.schemas.load import Trip, Leg
+from typing import Any, Dict, List, Optional
+
+from fastapi import Body, Depends
+
+from app.schemas.load import Leg, Trip
+
+logger = logging.getLogger(__name__)
 from app.core.utils.date_utils import parse_datetime_with_tz
 from app.core.utils.text_utils import find_first, find_all, parse_decimal
 from app.core.parser.regex_patterns import (
@@ -162,7 +167,7 @@ class ParsingService:
                 :param dispatcher_id:
         """
         if not self.text and not input_text:
-            print("Error: No text provided for parsing.")
+            logger.error("No text provided for parsing.")
             return None
 
         load_text = self.text if not input_text else input_text
@@ -184,8 +189,9 @@ class ParsingService:
             try:
                 split_point = load_text.index(assign_driver_marker)
             except ValueError:
-                print(
-                    "Warning: Could not find a reliable split point (second leg_id or 'Assign driver'). Parsing might be inaccurate."
+                logger.warning(
+                    "Could not find a reliable split point (second leg_id or "
+                    "'Assign driver'). Parsing might be inaccurate."
                 )
                 # Default: consider all information as trip_info
                 split_point = len(load_text)

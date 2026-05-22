@@ -487,7 +487,7 @@ class CompleteGroupManagementHandler:
         try:
             parts = callback_data.split("_")
             return len(parts) >= expected_parts and all(part for part in parts)
-        except:
+        except (AttributeError, TypeError):
             return False
 
     @staticmethod
