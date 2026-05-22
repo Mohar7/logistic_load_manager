@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import (
+    auth,
     bot_management,
     company_management,
     dispatcher_management,
@@ -48,16 +49,20 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add CORS middleware
+# CORS — wildcard is dev-only. Production should narrow `allow_origins`
+# to known frontend hosts. `allow_credentials=True` with `["*"]` is in
+# fact silently rejected by browsers, so this default is loose for dev
+# but harmless in any deployment that locks down origins.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify the origins
+    allow_origins=["*"] if settings.debug else [],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers
+# Include routers — auth first so its tag sorts at the top of /docs.
+app.include_router(auth.router)
 app.include_router(load_parser.router)
 app.include_router(load_management.router)
 app.include_router(driver_management.router)

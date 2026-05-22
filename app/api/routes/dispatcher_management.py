@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.dependencies import require_any_authenticated, require_role
 from app.db.database import get_db
 from app.schemas.dispatchers import AddDispatcher, DispatcherResponse
 from app.services.dispatcher_service import DispatcherService
@@ -19,7 +20,10 @@ router = APIRouter(
 
 
 @router.post(
-    "/", response_model=DispatcherResponse, status_code=status.HTTP_201_CREATED
+    "/",
+    response_model=DispatcherResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_any_authenticated)],
 )
 async def create_dispatcher(
     dispatcher_data: AddDispatcher,
@@ -85,7 +89,11 @@ async def read_dispatchers(
 # -------------------------------
 
 
-@router.put("/{dispatcher_id}", response_model=DispatcherResponse)
+@router.put(
+    "/{dispatcher_id}",
+    response_model=DispatcherResponse,
+    dependencies=[Depends(require_any_authenticated)],
+)
 async def update_dispatcher(
     dispatcher_id: int,
     name: str | None = None,
@@ -114,7 +122,11 @@ async def update_dispatcher(
 # -------------------------------
 
 
-@router.delete("/{dispatcher_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{dispatcher_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_role("admin"))],
+)
 async def delete_dispatcher(dispatcher_id: int, db: AsyncSession = Depends(get_db)):
     service = DispatcherService(db)
     try:

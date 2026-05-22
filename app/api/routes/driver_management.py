@@ -4,6 +4,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.dependencies import require_any_authenticated, require_role
 from app.db.database import get_db
 from app.schemas.driver import DriverCreate, DriverResponse
 from app.services.driver_service import DriverService
@@ -17,7 +18,11 @@ router = APIRouter(
 )
 
 
-@router.post("/", response_model=DriverResponse)
+@router.post(
+    "/",
+    response_model=DriverResponse,
+    dependencies=[Depends(require_any_authenticated)],
+)
 async def create_driver(driver: DriverCreate, db: AsyncSession = Depends(get_db)):
     """
     Create a new driver.
@@ -125,7 +130,11 @@ async def get_drivers(
         ]
 
 
-@router.put("/{driver_id}", response_model=DriverResponse)
+@router.put(
+    "/{driver_id}",
+    response_model=DriverResponse,
+    dependencies=[Depends(require_any_authenticated)],
+)
 async def update_driver(
     driver_id: int,
     driver_update: DriverCreate,
@@ -170,7 +179,7 @@ async def update_driver(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.delete("/{driver_id}")
+@router.delete("/{driver_id}", dependencies=[Depends(require_role("admin"))])
 async def delete_driver(driver_id: int, db: AsyncSession = Depends(get_db)):
     """
     Delete a driver.

@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.dependencies import require_any_authenticated, require_role
 from app.bot.services.chat_service import ChatService
 from app.db.database import get_db
 from app.db.models import Dispatchers, TelegramChat
@@ -55,7 +56,11 @@ class NotificationRequest(BaseModel):
 
 
 # Chat management endpoints
-@router.post("/chats", response_model=TelegramChatResponse)
+@router.post(
+    "/chats",
+    response_model=TelegramChatResponse,
+    dependencies=[Depends(require_any_authenticated)],
+)
 async def create_telegram_chat(
     chat_data: TelegramChatCreate, db: AsyncSession = Depends(get_db)
 ):
@@ -104,7 +109,7 @@ async def get_telegram_chats(db: AsyncSession = Depends(get_db)):
     ]
 
 
-@router.delete("/chats/{chat_id}")
+@router.delete("/chats/{chat_id}", dependencies=[Depends(require_role("admin"))])
 async def delete_telegram_chat(chat_id: int, db: AsyncSession = Depends(get_db)):
     """Delete a Telegram chat"""
     chat_service = ChatService(db)
@@ -186,7 +191,10 @@ async def get_dispatchers(db: AsyncSession = Depends(get_db)):
         )
 
 
-@router.post("/users/{user_id}/approve")
+@router.post(
+    "/users/{user_id}/approve",
+    dependencies=[Depends(require_any_authenticated)],
+)
 async def approve_user(user_id: int, db: AsyncSession = Depends(get_db)):
     """Approve a pending user registration"""
     try:
@@ -205,7 +213,7 @@ async def approve_user(user_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Error approving user: {e!s}")
 
 
-@router.delete("/users/{user_id}")
+@router.delete("/users/{user_id}", dependencies=[Depends(require_role("admin"))])
 async def delete_bot_user(user_id: int, db: AsyncSession = Depends(get_db)):
     """Delete a bot user"""
     try:
@@ -226,7 +234,10 @@ async def delete_bot_user(user_id: int, db: AsyncSession = Depends(get_db)):
 
 
 # Notification endpoints
-@router.post("/notifications/send")
+@router.post(
+    "/notifications/send",
+    dependencies=[Depends(require_any_authenticated)],
+)
 async def send_notification(
     notification: NotificationRequest,
     background_tasks: BackgroundTasks,
@@ -318,7 +329,10 @@ async def send_notification(
     return {"message": "Notification queued for sending"}
 
 
-@router.post("/notifications/load/{load_id}")
+@router.post(
+    "/notifications/load/{load_id}",
+    dependencies=[Depends(require_any_authenticated)],
+)
 async def notify_load_assignment(
     load_id: int,
     driver_id: int | None = None,
@@ -401,7 +415,7 @@ async def get_bot_stats(db: AsyncSession = Depends(get_db)):
 
 
 # Webhook endpoint for Telegram (if you want to use webhooks instead of polling)
-@router.post("/webhook")
+@router.post("/webhook", dependencies=[Depends(require_any_authenticated)])
 async def telegram_webhook(request: dict, db: AsyncSession = Depends(get_db)):
     """Handle Telegram webhook updates"""
     # This would be used if you switch from polling to webhooks

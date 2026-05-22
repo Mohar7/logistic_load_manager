@@ -171,3 +171,21 @@ class Leg(Base):
     load = relationship("Load", back_populates="legs")
     pickup_facility = relationship("Facility", foreign_keys=[pickup_facility_id])
     dropoff_facility = relationship("Facility", foreign_keys=[dropoff_facility_id])
+
+
+class User(Base):
+    """API user — separate from `Dispatchers` (which are Telegram entities).
+
+    Used for authenticating against /auth/login and authorizing mutating
+    endpoints. Roles: 'admin' (full access) | 'dispatcher' (read-write on
+    own scope) | 'viewer' (read-only).
+    """
+
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(64), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    role = Column(String(32), nullable=False, default="dispatcher")
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, server_default="now()")

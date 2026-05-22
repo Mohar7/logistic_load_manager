@@ -1,39 +1,50 @@
-# app/config.py - Updated to handle Telegram bot token from environment
-import os
+# app/config.py
+from __future__ import annotations
+
 from functools import lru_cache
 
-from dotenv import load_dotenv
-from pydantic_settings import BaseSettings
-
-# Load environment variables from .env file
-load_dotenv()
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """
-    Application settings loaded from environment variables.
+    """Application settings, loaded from environment / `.env`.
+
+    pydantic-settings handles env loading natively — no need for a
+    separate `load_dotenv()` + `os.getenv()` plumbing. Defaults here are
+    safe-for-dev placeholders; production must override.
     """
 
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    # ---- App ----
     app_name: str = "Logistics System"
-    debug: bool = os.getenv("DEBUG", "False").lower() in ("true", "1", "t")
+    debug: bool = False
 
-    # Database settings
-    db_host: str = os.getenv("DB_HOST", "localhost")
-    db_port: str = os.getenv("DB_PORT", "5432")
-    db_user: str = os.getenv("DB_USER", "postgres")
-    db_password: str = os.getenv("DB_PASSWORD", "5115")
-    db_name: str = os.getenv("DB_NAME", "logistics")
+    # ---- Database ----
+    db_host: str = "localhost"
+    db_port: str = "5432"
+    db_user: str = "postgres"
+    db_password: str = "change-me"
+    db_name: str = "logistics"
 
-    # Telegram Bot Configuration
-    telegram_bot_token: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    # ---- Telegram ----
+    telegram_bot_token: str = ""
 
-    class Config:
-        env_file = "../.env"
+    # ---- Auth (JWT) ----
+    # SECRET defaults are deliberately bad — meant to fail loudly if anyone
+    # ever runs without setting them. Production deployments MUST override
+    # via env vars.
+    jwt_secret_key: str = "INSECURE-DEV-ONLY-CHANGE-ME"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60
 
 
 @lru_cache
-def get_settings():
-    """
-    Returns cached settings instance for better performance.
-    """
+def get_settings() -> Settings:
+    """Cached settings singleton."""
     return Settings()

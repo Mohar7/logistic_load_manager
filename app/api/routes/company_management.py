@@ -4,6 +4,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.dependencies import require_any_authenticated, require_role
 from app.db.database import get_db
 from app.schemas.company import CompanyCreate, CompanyResponse
 from app.services.company_service import CompanyService
@@ -17,7 +18,11 @@ router = APIRouter(
 )
 
 
-@router.post("/", response_model=CompanyResponse)
+@router.post(
+    "/",
+    response_model=CompanyResponse,
+    dependencies=[Depends(require_any_authenticated)],
+)
 async def create_company(company: CompanyCreate, db: AsyncSession = Depends(get_db)):
     """
     Create a new company.
@@ -116,7 +121,11 @@ async def get_companies(
     ]
 
 
-@router.put("/{company_id}", response_model=CompanyResponse)
+@router.put(
+    "/{company_id}",
+    response_model=CompanyResponse,
+    dependencies=[Depends(require_any_authenticated)],
+)
 async def update_company(
     company_id: int,
     company_update: CompanyCreate,
@@ -164,7 +173,7 @@ async def update_company(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.delete("/{company_id}")
+@router.delete("/{company_id}", dependencies=[Depends(require_role("admin"))])
 async def delete_company(company_id: int, db: AsyncSession = Depends(get_db)):
     """
     Delete a company.

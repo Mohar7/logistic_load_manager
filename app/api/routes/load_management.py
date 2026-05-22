@@ -4,6 +4,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.dependencies import require_any_authenticated
 from app.db.database import get_db
 from app.db.models import Driver, Load
 from app.db.repositories.driver_repository import DriverRepository
@@ -19,7 +20,11 @@ router = APIRouter(
 )
 
 
-@router.put("/{load_id}/assign-driver/{driver_id}", response_model=LoadResponse)
+@router.put(
+    "/{load_id}/assign-driver/{driver_id}",
+    response_model=LoadResponse,
+    dependencies=[Depends(require_any_authenticated)],
+)
 async def assign_driver_to_load(
     load_id: int,
     driver_id: int,
@@ -181,7 +186,11 @@ async def get_available_drivers(db: AsyncSession = Depends(get_db)):
     return response
 
 
-@router.post("/{load_id}/notify-driver", response_model=dict)
+@router.post(
+    "/{load_id}/notify-driver",
+    response_model=dict,
+    dependencies=[Depends(require_any_authenticated)],
+)
 async def notify_driver(
     load_id: int,
     driver_id: int | None = None,

@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.dependencies import require_any_authenticated, require_role
 from app.core.parser.parsing_service import ParsingService, get_parsing_service
 from app.db.database import get_db
 from app.schemas.load import LoadResponse, LoadUpdateRequest, ParsedLoadResponse
@@ -16,7 +17,11 @@ router = APIRouter(
 )
 
 
-@router.post("/parse", response_model=ParsedLoadResponse)
+@router.post(
+    "/parse",
+    response_model=ParsedLoadResponse,
+    dependencies=[Depends(require_any_authenticated)],
+)
 async def parse_load(
     text: str = Body(..., media_type="text/plain"),
     parsing_service: ParsingService = Depends(get_parsing_service),
@@ -37,7 +42,11 @@ async def parse_load(
     return parsed_data
 
 
-@router.post("/create", response_model=LoadResponse)
+@router.post(
+    "/create",
+    response_model=LoadResponse,
+    dependencies=[Depends(require_any_authenticated)],
+)
 async def create_load(
     dispatcher_id: Annotated[int | None, Query()] = None,
     text: Annotated[str | None, Body(media_type="text/plain")] = None,
@@ -146,7 +155,11 @@ async def get_load(load_id: int, db: AsyncSession = Depends(get_db)):
     return response
 
 
-@router.put("/{load_id}", response_model=LoadResponse)
+@router.put(
+    "/{load_id}",
+    response_model=LoadResponse,
+    dependencies=[Depends(require_any_authenticated)],
+)
 async def update_load(
     load_id: int, load_update: LoadUpdateRequest, db: AsyncSession = Depends(get_db)
 ):
@@ -211,7 +224,11 @@ async def update_load(
         raise HTTPException(status_code=400, detail=f"Failed to update load: {e!s}")
 
 
-@router.put("/{load_id}/parse", response_model=LoadResponse)
+@router.put(
+    "/{load_id}/parse",
+    response_model=LoadResponse,
+    dependencies=[Depends(require_any_authenticated)],
+)
 async def update_load_with_parsed_data(
     load_id: int,
     dispatcher_id: Annotated[int | None, Query()] = None,
@@ -279,7 +296,7 @@ async def update_load_with_parsed_data(
         raise HTTPException(status_code=400, detail=f"Failed to update load: {e!s}")
 
 
-@router.delete("/{load_id}")
+@router.delete("/{load_id}", dependencies=[Depends(require_role("admin"))])
 async def delete_load(load_id: int, db: AsyncSession = Depends(get_db)):
     """
     Delete a load and all its associated legs.

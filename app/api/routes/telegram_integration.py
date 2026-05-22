@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.dependencies import require_any_authenticated, require_role
 from app.db.database import get_db
 from app.db.models import Driver, TelegramChat
 
@@ -32,7 +33,7 @@ class DriverChatLinkResponse(BaseModel):
     chat_token: int
 
 
-@router.post("/link-driver")
+@router.post("/link-driver", dependencies=[Depends(require_any_authenticated)])
 async def link_driver_to_chat(
     request: LinkDriverToChatRequest, db: AsyncSession = Depends(get_db)
 ):
@@ -69,7 +70,7 @@ async def link_driver_to_chat(
         raise HTTPException(status_code=500, detail=f"Error linking driver: {e!s}")
 
 
-@router.post("/unlink-driver")
+@router.post("/unlink-driver", dependencies=[Depends(require_any_authenticated)])
 async def unlink_driver_from_chat(
     request: UnlinkDriverRequest, db: AsyncSession = Depends(get_db)
 ):
@@ -160,7 +161,10 @@ async def get_available_chats(db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Error retrieving chats: {e!s}")
 
 
-@router.post("/send-test-message/{chat_token}")
+@router.post(
+    "/send-test-message/{chat_token}",
+    dependencies=[Depends(require_any_authenticated)],
+)
 async def send_test_message(
     chat_token: int,
     message: str = "🤖 Test message from Logistics Bot",
@@ -281,7 +285,7 @@ async def get_chat_info(chat_token: int, db: AsyncSession = Depends(get_db)):
         )
 
 
-@router.delete("/chat/{chat_token}")
+@router.delete("/chat/{chat_token}", dependencies=[Depends(require_role("admin"))])
 async def remove_telegram_chat(chat_token: int, db: AsyncSession = Depends(get_db)):
     """Remove a Telegram chat from the system"""
     try:
