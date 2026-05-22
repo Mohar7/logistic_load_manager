@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_PYTHON: "3.12"
+
+jobs:
+  lint:
+    name: Lint (ruff + mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Pin Python
+        run: uv python install ${{ env.UV_PYTHON }}
+
+      - name: Sync deps
+        run: uv sync --frozen
+
+      - name: ruff check
+        run: uv run ruff check app/ tests/
+
+      - name: ruff format --check
+        run: uv run ruff format --check app/ tests/
+
+      - name: mypy
+        run: uv run mypy app/
+        continue-on-error: true
+
+  test:
+    name: Test (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Pin Python
+        run: uv python install ${{ env.UV_PYTHON }}
+
+      - name: Sync deps
+        run: uv sync --frozen
+
+      - name: pytest with coverage
+        env:
+          DB_HOST: localhost
+          DB_USER: u
+          DB_PASSWORD: p
+          DB_NAME: test
+          TELEGRAM_BOT_TOKEN: test-token
+          JWT_SECRET_KEY: ci-secret-not-for-production
+        run: |
+          uv run pytest \
+            --cov=app \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --junitxml=junit.xml
+
+      - name: Upload coverage XML
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-xml
+          path: coverage.xml
+
+      - name: Upload junit XML
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit-xml
+          path: junit.xml
