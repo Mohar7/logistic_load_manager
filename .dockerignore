@@ -1,0 +1,49 @@
+# Keep the image small and the build context fast to transfer.
+
+# ---- VCS / IDE / OS ----
+.git
+.gitignore
+.gitattributes
+.github
+.idea
+.vscode
+*.swp
+.DS_Store
+
+# ---- Local dev artifacts ----
+.venv
+venv
+env
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+coverage.xml
+junit.xml
+
+# ---- Secrets / local config ----
+.env
+.env.*
+!.env.example
+
+# ---- Frontend (built separately) ----
+frontend
+node_modules
+
+# ---- Tests don't ship with the image ----
+tests
+
+# ---- Docs / one-off scripts ----
+README.md
+LICENSE
+*.md
+!alembic/README
+draft.md
+scripts
+
+# ---- Misc ----
+.pre-commit-config.yaml
+.mailmap

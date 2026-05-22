@@ -1,116 +1,89 @@
+# docker-compose.yml — single command to bring up API + bot + Postgres.
+#
+#   docker compose --profile bot up         # API + DB + bot
+#   docker compose up                       # API + DB only
+#
+# The `app` service runs alembic on startup; the `bot` service sets
+# SKIP_MIGRATIONS=1 to avoid racing on alembic_version.
+
 services:
-  # Frontend service (new)
-  frontend:
-    build:
-      context: ./frontend  # assuming your frontend code is in ./frontend directory
-      dockerfile: Dockerfile
-    container_name: logistics-frontend
-    networks:
-      - app-network
-    restart: always
-    ports:
-      - "5173:5173"  # Vite dev server port
-      - "4173:4173"  # Vite preview port
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules  # prevent node_modules from being overwritten
-    # Choose one of these commands:
-    command: ["sh", "-c", "pnpm vite build && pnpm preview --host 0.0.0.0"]
-    environment:
-      - NODE_ENV=production
-      - VITE_API_URL=http://0.0.0.0:8000  # Point to your backend API
-
-  app:
-    build: .
-    container_name: logistics-api
-    networks:
-      - app-network
-    restart: always
-    ports:
-      - "8000:8000"
-    depends_on:
-      - db
-    environment:
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_USER=postgres
-      - DB_PASSWORD=5115
-      - DB_NAME=logistics
-      - DEBUG=True
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-YOUR_TELEGRAM_BOT_TOKEN}
-    volumes:
-      - ./app:/app/app
-      - ./alembic:/app/alembic
-    command: >
-      bash -c "
-      while ! nc -z db 5432; do sleep 0.5; done &&
-      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-      "
-
-  # Optional: Run bot separately if you prefer
-  bot:
-    build: .
-    container_name: logistics-bot
-    networks:
-      - app-network
-    restart: always
-    depends_on:
-      - db
-      - app
-    environment:
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_USER=postgres
-      - DB_PASSWORD=5115
-      - DB_NAME=logistics
-      - DEBUG=True
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-    volumes:
-      - ./app:/app/app
-    command: python app/bot/start_bot.py
 
   db:
-    image: postgres:latest
-    networks:
-      - app-network
+    image: postgres:16-alpine
     container_name: logistics-db
-    restart: always
-    ports:
-      - "5115:5432"
+    restart: unless-stopped
+    networks: [app-network]
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=5115
-      - POSTGRES_DB=logistics
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      POSTGRES_DB: ${DB_NAME:-logistics}
     volumes:
       - logistics-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
       interval: 5s
-      timeout: 5s
+      timeout: 3s
       retries: 5
+    # Host port intentionally NOT exposed by default — only the app
+    # network can reach the DB. Uncomment for psql-from-host debugging.
+    # ports:
+    #   - "5432:5432"
 
-  init-db:
-    build: .
-    container_name: logistics-init-db
-    networks:
-      - app-network
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: logistics-api:latest
+    container_name: logistics-api
+    restart: unless-stopped
+    networks: [app-network]
     depends_on:
       db:
         condition: service_healthy
     environment:
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_USER=postgres
-      - DB_PASSWORD=5115
-      - DB_NAME=logistics
-    command: >
-      bash -c "
-      alembic upgrade head &&
-      python -c 'from app.db.init_db import init_db; from app.db.database import SessionLocal; init_db(SessionLocal())'
-      "
-    volumes:
-      - ./app:/app/app
-      - ./alembic:/app/alembic
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      DB_NAME: ${DB_NAME:-logistics}
+      DEBUG: ${DEBUG:-False}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set in .env}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-60}
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: logistics-api:latest
+    container_name: logistics-bot
+    restart: unless-stopped
+    profiles: [bot]  # `docker compose --profile bot up` to include
+    networks: [app-network]
+    depends_on:
+      db:
+        condition: service_healthy
+      app:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      DB_NAME: ${DB_NAME:-logistics}
+      DEBUG: ${DEBUG:-False}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN must be set when running bot}
+      SKIP_MIGRATIONS: "1"  # API container handles migrations
+    command: ["python", "app/bot/start_bot.py"]
 
 volumes:
   logistics-db-data:
